@@ -105,3 +105,104 @@ export function playAbsorb(element = 'fire') {
 export function resumeAudio() {
   ensureContext();
 }
+
+// --- Gothic-electro background music ----------------------------------------
+let musicInterval = null;
+let musicMuted = false;
+let musicStep = 0;
+const BPM = 108;
+const STEP_SECONDS = 60 / BPM / 4; // 16th notes
+
+function scheduleStep() {
+  if (musicMuted || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  const step = musicStep % 16;
+
+  // D minor-ish bass line on beats.
+  const bassNotes = [73.42, 0, 73.42, 0, 65.41, 0, 58.27, 0, 73.42, 0, 73.42, 0, 65.41, 0, 58.27, 55.0];
+  const bass = bassNotes[step];
+  if (bass > 0) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(bass, t);
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(400, t);
+    filter.frequency.exponentialRampToValueAtTime(120, t + 0.35);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.12, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  }
+
+  // Arpeggiated cathedral line.
+  const arpNotes = [0, 293.66, 349.23, 392.0, 0, 293.66, 349.23, 440.0, 0, 293.66, 349.23, 392.0, 0, 261.63, 349.23, 392.0];
+  const arp = arpNotes[step];
+  if (arp > 0) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(arp, t);
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1800, t);
+    filter.Q.value = 8;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.04, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.28);
+  }
+
+  // Electronic kick on 0, 4, 8, 12.
+  if (step % 4 === 0) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.12);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.35, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+
+  // Snare/clap on 4 and 12.
+  if (step === 4 || step === 12) {
+    playNoise({ duration: 0.12, volume: 0.1, filterFreq: 2500, filterType: 'highpass', attack: 0.001 });
+  }
+
+  musicStep += 1;
+}
+
+export function startMusic() {
+  if (musicInterval) return;
+  ensureContext();
+  musicInterval = setInterval(scheduleStep, STEP_SECONDS * 1000);
+}
+
+export function stopMusic() {
+  if (musicInterval) {
+    clearInterval(musicInterval);
+    musicInterval = null;
+  }
+}
+
+export function toggleMusic() {
+  musicMuted = !musicMuted;
+  return musicMuted;
+}
+
+export function isMusicMuted() {
+  return musicMuted;
+}

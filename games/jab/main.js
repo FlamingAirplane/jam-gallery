@@ -21,7 +21,7 @@ import {
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=2';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
-import { playHit, playDeath, playAbsorb, resumeAudio } from './audio.js?v=2';
+import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
 import {
   createUI, setScore, setFloor, setWave, setHealth, showGameOver, hideGameOver,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
@@ -160,6 +160,14 @@ const spellings = (event) => [event.code, event.key, event.key.toLowerCase(), ev
 // The left button is reported to player.js both as ctx.mouseDown and as a key token.
 const MOUSE_TOKENS = ['mouse', 'Mouse0', 'mouse0', 'MouseLeft', 'mouseleft', 'Primary', 'primary', 'Fire'];
 
+let musicStarted = false;
+function tryStartMusic() {
+  if (!musicStarted) {
+    musicStarted = true;
+    startMusic();
+  }
+}
+
 function setMouseDown(down) {
   ctx.mouseDown = down;
   for (const token of MOUSE_TOKENS) {
@@ -170,7 +178,12 @@ function setMouseDown(down) {
 addEventListener('keydown', (event) => {
   if (event.code === 'Space') event.preventDefault();
   for (const token of spellings(event)) keys.add(token);
+  if (event.code === 'KeyM') {
+    const muted = toggleMusic();
+    ui.setMusicMuted(muted);
+  }
   if (state === 'gameover' && event.key.toLowerCase() === 'r') restart();
+  tryStartMusic();
 });
 addEventListener('keyup', (event) => { for (const token of spellings(event)) keys.delete(token); });
 
@@ -178,6 +191,7 @@ addEventListener('mousedown', (event) => {
   if (event.button === 0) {
     setMouseDown(true);
     resumeAudio();
+    tryStartMusic();
   }
 });
 addEventListener('mouseup', (event) => { if (event.button === 0) setMouseDown(false); });
@@ -195,6 +209,7 @@ addEventListener('touchstart', (event) => {
   mouseNDC.x = (t.clientX / innerWidth) * 2 - 1;
   mouseNDC.y = -(t.clientY / innerHeight) * 2 + 1;
   setMouseDown(true);
+  tryStartMusic();
 }, { passive: false });
 addEventListener('touchmove', (event) => {
   event.preventDefault();

@@ -76,12 +76,23 @@ export function createUI() {
   Object.assign(wave.style, { marginTop: '4px', fontSize: '13px', color: GREY.pale });
   panel.append(wave);
 
-  els = { score, floor, wave, hp, bar, over, overStats };
+  const music = document.createElement('div');
+  music.textContent = 'Music: ON (M to mute)';
+  Object.assign(music.style, { marginTop: '4px', fontSize: '12px', color: GREY.light });
+  panel.append(music);
+
+  els = { score, floor, wave, hp, bar, over, overStats, music };
   setScore(0);
   setFloor(1);
   setWave(1, 1);
   setHealth(1, 1);
-  return { setRestartHandler(fn) { onRestart = fn; } };
+  return {
+    setRestartHandler(fn) { onRestart = fn; },
+    setMusicMuted(muted) {
+      if (!els) return;
+      els.music.textContent = muted ? 'Music: MUTED (M to unmute)' : 'Music: ON (M to mute)';
+    },
+  };
 }
 
 export function setScore(n) {
