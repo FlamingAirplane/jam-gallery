@@ -136,6 +136,15 @@ export const earthquakeDamage = 30;
 export const earthquakeKnockback = 10;
 export const earthquakeDuration = 0.5;      // seconds for the shockwave to expand
 
+// Elemental status effects
+export const burnDamagePerSecond = 5;      // fire damage over time
+export const burnDuration = 3;             // seconds
+export const waterSpeedBoostMul = 1.35;    // temporary move-speed boost
+export const waterSpeedBoostDuration = 2;  // seconds
+export const earthSlowChance = 0.25;       // chance earth attacks slow
+export const earthSlowMul = 0.5;           // speed multiplier while slowed
+export const earthSlowDuration = 2;        // seconds
+
 // FX timing
 export const muzzleFlashDuration = 0.06;
 export const trailSpawnInterval = 0.04;  // seconds between trail dots

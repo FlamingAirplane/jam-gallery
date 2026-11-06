@@ -11,6 +11,8 @@ import {
   mageProjectileRadius, mageProjectileRange,
   brawlerModelScale, archerModelScale, mageModelScale,
   leaderAuraRadius, leaderSpeedMul, heroHpMul, heroSpeedMul, cowardFleeHpRatio,
+  burnDamagePerSecond, burnDuration,
+  earthSlowMul, earthSlowDuration,
 } from './tuning.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -162,6 +164,9 @@ export function spawnEnemyAt(scene, position, role = null) {
     role: chosenRole,
     personality,
     fireTimer: Math.random() * 0.8,
+    burnTimer: 0,
+    slowTimer: 0,
+    scatterTimer: 0,
   });
   return enemies[enemies.length - 1];
 }
@@ -253,10 +258,33 @@ export function updateEnemies(dt, targetPos) {
     enemies.splice(i, 1);
   }
 
-  // Pre-compute leader positions for the aura.
+  // Pre-compute leader positions for the aura and personality behaviours.
   const leaderPositions = enemies
     .filter((e) => e.personality === 'leader' && e.alive)
     .map((e) => e.mesh.position);
+  const anyLeaderAlive = leaderPositions.length > 0;
+  const burnKills = [];
+
+  function nearestLeader(pos) {
+    let best = null;
+    let bestD = Infinity;
+    for (const lp of leaderPositions) {
+      const d = pos.distanceTo(lp);
+      if (d < bestD) { bestD = d; best = lp; }
+    }
+    return best;
+  }
+  function nearestAlly(enemy, maxDist, filterFn = null) {
+    let best = null;
+    let bestD = maxDist;
+    for (const other of enemies) {
+      if (other === enemy || !alive(other)) continue;
+      if (filterFn && !filterFn(other)) continue;
+      const d = enemy.mesh.position.distanceTo(other.mesh.position);
+      if (d < bestD) { bestD = d; best = other; }
+    }
+    return best;
+  }
 
   for (const enemy of enemies) {
     const position = enemy.mesh.position;
@@ -264,8 +292,23 @@ export function updateEnemies(dt, targetPos) {
     const dz = targetPos.z - position.z;
     const distance = Math.hypot(dx, dz);
 
+    // Status effects.
+    if (enemy.burnTimer > 0) {
+      enemy.burnTimer -= dt;
+      enemy.hp -= burnDamagePerSecond * dt;
+      if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp);
+      if (enemy.hp <= 0) {
+        enemy.alive = false;
+        burnKills.push(enemy);
+        continue;
+      }
+    }
+    if (enemy.slowTimer > 0) enemy.slowTimer -= dt;
+    if (enemy.scatterTimer > 0) enemy.scatterTimer -= dt;
+
     // Personality speed modifiers.
     let speedMul = enemy.personality === 'hero' ? heroSpeedMul : 1;
+    if (enemy.slowTimer > 0) speedMul *= earthSlowMul;
     for (const lp of leaderPositions) {
       if (lp === position) continue;
       if (position.distanceTo(lp) < leaderAuraRadius) {
@@ -274,8 +317,12 @@ export function updateEnemies(dt, targetPos) {
       }
     }
 
-    // Cowards run away when badly hurt.
+    // Cowards run away when badly hurt or try to hide behind an ally.
+    const nearestAnyAlly = nearestAlly(enemy, 15);
+    const cowardHiding = enemy.personality === 'coward' && distance < 20 && nearestAnyAlly;
     const fleeing = enemy.personality === 'coward' && enemy.hp / enemy.maxHp < cowardFleeHpRatio && distance < 30;
+    const scattering = enemy.personality === 'grunt' && !anyLeaderAlive && enemy.scatterTimer <= 0;
+    if (scattering) enemy.scatterTimer = 2;
 
     if (enemy.role === 'archer' || enemy.role === 'mage') {
       const isMage = enemy.role === 'mage';
@@ -286,9 +333,15 @@ export function updateEnemies(dt, targetPos) {
 
       let moveDirX = 0;
       let moveDirZ = 0;
-      if (fleeing) {
+      if (fleeing || (enemy.scatterTimer > 0)) {
         moveDirX = -dx / distance;
         moveDirZ = -dz / distance;
+      } else if (cowardHiding) {
+        const ap = nearestAnyAlly.mesh.position;
+        moveDirX = ap.x - position.x;
+        moveDirZ = ap.z - position.z;
+        const len = Math.hypot(moveDirX, moveDirZ);
+        if (len > 0.01) { moveDirX /= len; moveDirZ /= len; }
       } else {
         const tooClose = distance < prefRange - rangeTol;
         const tooFar = distance > prefRange + rangeTol;
@@ -312,9 +365,9 @@ export function updateEnemies(dt, targetPos) {
         enemy.mesh.rotation.y = Math.atan2(dx, dz);
       }
 
-      // Fire when roughly in range and not fleeing.
+      // Fire when roughly in range and not fleeing/scattering/hiding.
       enemy.fireTimer -= dt;
-      if (!fleeing && enemy.fireTimer <= 0 && distance < prefRange + rangeTol * 2 && distance > 1) {
+      if (!fleeing && !cowardHiding && enemy.scatterTimer <= 0 && enemy.fireTimer <= 0 && distance < prefRange + rangeTol * 2 && distance > 1) {
         const origin = position.clone().add(new THREE.Vector3(0, enemyRadius, 0));
         const dir = new THREE.Vector3(dx / distance, 0, dz / distance);
         if (isMage) {
@@ -325,21 +378,61 @@ export function updateEnemies(dt, targetPos) {
         enemy.fireTimer = 1 / fireRate + Math.random() * 0.2;
       }
     } else {
-      // Brawler: rush straight at the golem (or flee).
+      // Brawler movement, modified by personality.
+      let moveDirX = dx;
+      let moveDirZ = dz;
+      let isRushing = true;
+
+      if (enemy.personality === 'grunt' && anyLeaderAlive) {
+        // Follow the nearest leader.
+        const leader = nearestLeader(position);
+        if (leader) {
+          moveDirX = leader.x - position.x;
+          moveDirZ = leader.z - position.z;
+        }
+      } else if (enemy.personality === 'hero') {
+        // Shield the nearest hurt ally by standing between them and the player.
+        const protect = nearestAlly(enemy, 20, (o) => o.hp / o.maxHp < 0.5);
+        if (protect) {
+          const pp = protect.mesh.position;
+          const toAlly = new THREE.Vector3(pp.x - targetPos.x, 0, pp.z - targetPos.z).normalize();
+          const shieldPos = pp.clone().addScaledVector(toAlly, 2.5);
+          moveDirX = shieldPos.x - position.x;
+          moveDirZ = shieldPos.z - position.z;
+        }
+      } else if (fleeing) {
+        moveDirX = -dx;
+        moveDirZ = -dz;
+        isRushing = false;
+      } else if (cowardHiding) {
+        const ap = nearestAnyAlly.mesh.position;
+        moveDirX = ap.x - position.x;
+        moveDirZ = ap.z - position.z;
+        isRushing = false;
+      } else if (enemy.scatterTimer > 0) {
+        moveDirX = -dx;
+        moveDirZ = -dz;
+        isRushing = false;
+      }
+
+      const len = Math.hypot(moveDirX, moveDirZ);
+      if (len > 0.01) {
+        moveDirX /= len;
+        moveDirZ /= len;
+      }
+
       let step = enemySpeed * speedMul * dt;
-      if (fleeing) {
-        step *= -1;
-      }
-      if (distance > 1e-4) {
-        const travel = Math.min(Math.abs(step), distance) * Math.sign(step);
-        position.x += (dx / distance) * travel;
-        position.z += (dz / distance) * travel;
-        enemy.mesh.rotation.y = Math.atan2(dx, dz);
-      }
+      if (!isRushing) step *= 0.8; // flee/hide/scatter a little slower
+      const travel = Math.min(step, len);
+      position.x += moveDirX * travel;
+      position.z += moveDirZ * travel;
+      enemy.mesh.rotation.y = Math.atan2(moveDirX, moveDirZ);
     }
 
     position.y = 0;
   }
+
+  return burnKills;
 }
 
 export function getEnemies() {

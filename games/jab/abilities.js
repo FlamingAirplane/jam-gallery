@@ -149,7 +149,7 @@ export function updateAbilities(dt, enemies, scene) {
             const pushDir = d > 0.01
               ? new THREE.Vector3(enemy.mesh.position.x - center.x, 0, enemy.mesh.position.z - center.z).normalize()
               : new THREE.Vector3(1, 0, 0);
-            events.push({ type: 'damage', enemy, damage: fireGrenadeDamage });
+            events.push({ type: 'damage', enemy, damage: fireGrenadeDamage, applyBurn: true });
             events.push({ type: 'knockback', enemy, dir: pushDir, amount: 9 });
           }
         }
@@ -201,7 +201,7 @@ export function updateAbilities(dt, enemies, scene) {
           const pushDir = d > 0.01
             ? new THREE.Vector3(enemy.mesh.position.x - ab.origin.x, 0, enemy.mesh.position.z - ab.origin.z).normalize()
             : new THREE.Vector3(1, 0, 0);
-          events.push({ type: 'damage', enemy, damage: earthquakeDamage });
+          events.push({ type: 'damage', enemy, damage: earthquakeDamage, applySlow: true });
           events.push({ type: 'knockback', enemy, dir: pushDir, amount: earthquakeKnockback });
         }
       }

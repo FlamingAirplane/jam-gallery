@@ -21,6 +21,8 @@ import {
   elementRotationSpeedMul,
   trailSpawnInterval,
   arrowTurnSpeed,
+  waterSpeedBoostMul,
+  waterSpeedBoostDuration,
 } from './tuning.js';
 import { spawnMuzzleFlash, spawnProjectileTrailDot, clearFX } from './fx.js?v=2';
 import { playShoot } from './audio.js?v=2';
@@ -34,6 +36,7 @@ let activePlayer = null; // whose position new shots start from
 let shotScene = null; // the scene shot meshes are added to
 let fireTimer = 0; // seconds until the next shot is allowed
 const projectiles = []; // [{ mesh, dir, damage, alive, traveled, speed, pierce }]
+let speedBoostTimer = 0; // water speed boost remaining time
 
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const raycaster = new THREE.Raycaster();
@@ -144,6 +147,7 @@ export function createPlayer(scene) {
   scene.add(group);
   shotScene = scene;
   fireTimer = 0;
+  speedBoostTimer = 0;
 
   const player = {
     group,
@@ -179,6 +183,10 @@ export function getElement(player) {
   return player.element;
 }
 
+export function applyWaterSpeedBoost() {
+  speedBoostTimer = waterSpeedBoostDuration;
+}
+
 export function updatePlayer(player, dt, ctx) {
   activePlayer = player;
   const keys = ctx.keys;
@@ -199,8 +207,15 @@ export function updatePlayer(player, dt, ctx) {
   if (held(keys, 'KeyS', 's')) moveStep.add(screenUp);
   if (held(keys, 'KeyD', 'd')) moveStep.add(screenRight);
   if (held(keys, 'KeyA', 'a')) moveStep.sub(screenRight);
+  // Water moves build a short speed boost.
+  let speedMul = 1;
+  if (speedBoostTimer > 0) {
+    speedBoostTimer -= dt;
+    speedMul = waterSpeedBoostMul;
+  }
+
   if (moveStep.lengthSq() > 0) {
-    moveStep.normalize().multiplyScalar(moveSpeed * elementMoveSpeedMul[player.element] * dt);
+    moveStep.normalize().multiplyScalar(moveSpeed * elementMoveSpeedMul[player.element] * speedMul * dt);
     position.x = clamp(position.x + moveStep.x, -arenaSize, arenaSize);
     position.z = clamp(position.z + moveStep.z, -arenaSize, arenaSize);
   }

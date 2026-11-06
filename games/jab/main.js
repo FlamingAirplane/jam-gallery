@@ -11,19 +11,20 @@ import {
   columnRadius,
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
+  burnDuration, earthSlowChance, earthSlowDuration,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=8';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=9';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
-} from './enemies.js?v=4';
+} from './enemies.js?v=5';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
 import { buildMap } from './level.js?v=4';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns,
-} from './abilities.js?v=1';
+} from './abilities.js?v=2';
 import {
   createUI, setScore, setFloor, setWave, setHealth, showGameOver, hideGameOver,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
@@ -130,6 +131,7 @@ function tryTriggerAbility() {
   if (state !== 'playing' || !player) return;
   const result = triggerAbility(player, scene);
   if (result) {
+    if (player.element === 'water') applyWaterSpeedBoost();
     resumeAudio();
     tryStartMusic();
   }
@@ -461,6 +463,12 @@ function hitEnemies() {
       if (distanceXZ(shot.mesh.position, enemy.mesh.position) < reach) {
         enemy.hp -= shot.damage ?? projectileDamage;
         if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
+
+        // Elemental status effects.
+        if (player.element === 'fire') enemy.burnTimer = burnDuration;
+        if (player.element === 'earth' && Math.random() < earthSlowChance) enemy.slowTimer = earthSlowDuration;
+        if (player.element === 'water') applyWaterSpeedBoost();
+
         if (shot.pierce !== undefined) {
           shot.pierce -= 1;
           if (shot.pierce <= 0) {
@@ -561,7 +569,12 @@ function update(dt) {
   resolveColumnCollisions(player.group.position, playerRadius);
   resolveWallCollisions(player.group.position, playerRadius);
   updateProjectiles(dt);
-  updateEnemies(dt, player.group.position);
+  const burnKills = updateEnemies(dt, player.group.position);
+  for (const enemy of burnKills) {
+    if (enemy.mesh && enemy.mesh.parent) enemy.mesh.parent.remove(enemy.mesh);
+    if (enemy.healthBar) { enemy.healthBar.remove(); enemy.healthBar = null; }
+    killEnemy(enemy, enemy.mesh.position.clone());
+  }
   updateEnemyProjectiles(dt);
   blockProjectiles();
   separateEnemies();
@@ -587,6 +600,8 @@ function update(dt) {
   for (const ev of abilityEvents) {
     if (ev.type === 'damage') {
       damageEnemy(ev.enemy, ev.damage);
+      if (ev.applyBurn) ev.enemy.burnTimer = burnDuration;
+      if (ev.applySlow) ev.enemy.slowTimer = earthSlowDuration;
     } else if (ev.type === 'knockback') {
       if (alive(ev.enemy)) {
         ev.enemy.mesh.position.addScaledVector(ev.dir, ev.amount * dt);
