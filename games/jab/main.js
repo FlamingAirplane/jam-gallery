@@ -15,7 +15,7 @@ import {
   xpBase, xpGrowth, xpValues, levelUpChoices, upgradeOptions,
   itemDropChance, itemDuration,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=10';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=11';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
@@ -28,7 +28,7 @@ import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, i
 import { buildMap } from './level.js?v=4';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns,
-} from './abilities.js?v=2';
+} from './abilities.js?v=3';
 import {
   createUI, setScore, setFloor, setWave, setHealth, setLevel, setXP, showGameOver, hideGameOver,
   showLevelUp, hideLevelUp,

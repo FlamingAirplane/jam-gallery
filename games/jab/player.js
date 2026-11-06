@@ -16,6 +16,8 @@ import {
   earthProjectileSpeed,
   earthProjectileScale,
   waterPierceCount,
+  windProjectileSpeed,
+  windPierceCount,
   elementMoveSpeedMul,
   elementFireRateMul,
   elementRotationSpeedMul,
@@ -120,7 +122,7 @@ function attachModelForElement(group, type) {
   for (let i = group.children.length - 1; i >= 0; i--) {
     group.remove(group.children[i]);
   }
-  // Pick the variant: fire/earth use their own model; water (and any fallback) uses base.
+  // Pick the variant: fire/earth use their own model; water/wind (and any fallback) uses base.
   let key = 'base';
   if (type === 'fire' && golemTemplates.fire) key = 'fire';
   else if (type === 'earth' && golemTemplates.earth) key = 'earth';
@@ -303,6 +305,12 @@ function spawnShot(player) {
     mesh.scale.setScalar(earthProjectileScale);
     speed = earthProjectileSpeed;
     damage = projectileDamage * 1.5 * player.upgrades.damage;
+  } else if (element === 'wind') {
+    // Fast, thin, piercing dart.
+    mesh = new THREE.Mesh(projectileGeometry, material);
+    mesh.scale.set(0.35, 0.35, 2.2);
+    speed = windProjectileSpeed;
+    pierce = windPierceCount;
   } else {
     // Fire: fast default bolt.
     mesh = new THREE.Mesh(projectileGeometry, material);

@@ -5,6 +5,7 @@ import {
   fireGrenadeSpeed, fireGrenadeFuse, fireGrenadeBlastRadius, fireGrenadeDamage,
   waterWaveSpeed, waterWaveWidth, waterWaveRange, waterWaveDamage, waterWaveKnockback,
   earthquakeRadius, earthquakeDamage, earthquakeKnockback, earthquakeDuration,
+  windGustSpeed, windGustWidth, windGustRange, windGustDamage, windGustKnockback,
   elementColors,
 } from './tuning.js';
 
@@ -57,6 +58,20 @@ function makeQuakeMesh() {
   return mesh;
 }
 
+function makeGustMesh() {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(windGustWidth, 0.2, 1),
+    new THREE.MeshStandardMaterial({
+      color: elementColors.wind,
+      transparent: true,
+      opacity: 0.45,
+      roughness: 0.2,
+    })
+  );
+  mesh.position.y = 0.15;
+  return mesh;
+}
+
 export function triggerAbility(player, scene) {
   const element = player.element;
   if (!element || cooldowns[element] > 0) return null;
@@ -106,6 +121,21 @@ export function triggerAbility(player, scene) {
       origin: origin.clone(),
       duration: earthquakeDuration,
       elapsed: 0,
+      damaged: new Set(),
+    });
+  } else if (element === 'wind') {
+    const mesh = makeGustMesh();
+    mesh.position.copy(origin);
+    mesh.position.y = 0.15;
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    scene.add(mesh);
+    abilities.push({
+      type: 'gust',
+      element,
+      mesh,
+      origin: origin.clone(),
+      dir,
+      traveled: 0,
       damaged: new Set(),
     });
   }
@@ -168,7 +198,6 @@ export function updateAbilities(dt, enemies, scene) {
       ab.mesh.scale.z = Math.max(1, ab.traveled);
 
       // Damage enemies inside the wave front.
-      const waveFront = ab.origin.clone().addScaledVector(ab.dir, ab.traveled);
       const halfWidth = waterWaveWidth / 2;
       for (const enemy of enemies) {
         if (!alive(enemy) || ab.damaged.has(enemy)) continue;
@@ -183,6 +212,28 @@ export function updateAbilities(dt, enemies, scene) {
       }
 
       if (ab.traveled >= waterWaveRange) cleanupAbility(i, scene);
+    }
+
+    if (ab.type === 'gust') {
+      const step = windGustSpeed * dt;
+      ab.traveled += step;
+      ab.mesh.position.copy(ab.origin).addScaledVector(ab.dir, ab.traveled / 2);
+      ab.mesh.scale.z = Math.max(1, ab.traveled);
+
+      const halfWidth = windGustWidth / 2;
+      for (const enemy of enemies) {
+        if (!alive(enemy) || ab.damaged.has(enemy)) continue;
+        const toEnemy = new THREE.Vector3().subVectors(enemy.mesh.position, ab.origin);
+        const along = toEnemy.dot(ab.dir);
+        const perp = Math.sqrt(Math.max(0, toEnemy.lengthSq() - along * along));
+        if (along >= 0 && along <= ab.traveled && perp < halfWidth + enemy.radius) {
+          ab.damaged.add(enemy);
+          events.push({ type: 'damage', enemy, damage: windGustDamage });
+          events.push({ type: 'knockback', enemy, dir: ab.dir.clone(), amount: windGustKnockback });
+        }
+      }
+
+      if (ab.traveled >= windGustRange) cleanupAbility(i, scene);
     }
 
     if (ab.type === 'quake') {

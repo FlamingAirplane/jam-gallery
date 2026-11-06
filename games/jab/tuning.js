@@ -91,11 +91,12 @@ export const internalWallLength = 18;
 export const internalWallThickness = 1.8;
 
 // Elements
-export const elementTypes = ['fire', 'water', 'earth'];
+export const elementTypes = ['fire', 'water', 'earth', 'wind'];
 export const elementColors = {
   fire: '#e74c3c',   // warm red-orange
   water: '#3498db',  // cool blue
   earth: '#8e44ad',  // stone purple / brownish
+  wind: '#95a5a6',   // pale silver / air
 };
 
 // Per-element projectile behaviour
@@ -104,6 +105,8 @@ export const waterProjectileSpeed = 28;  // piercing beam
 export const earthProjectileSpeed = 18;  // heavy slow blast
 export const earthProjectileScale = 2.0; // bigger projectile
 export const waterPierceCount = 3;       // how many enemies a water shot passes through
+export const windProjectileSpeed = 55;   // very fast dart
+export const windPierceCount = 2;        // cuts through a couple enemies
 
 // Element fields
 export const elementFieldCount = 2;      // fields spawned per floor
@@ -115,22 +118,25 @@ export const elementMoveSpeedMul = {
   fire: 1.0,
   water: 1.25,   // water feels flowing and mobile
   earth: 0.75,   // earth feels heavy
+  wind: 1.15,    // wind feels light and quick
 };
 
 export const elementFireRateMul = {
   fire: 1.0,     // fast
   water: 0.8,    // steady
   earth: 0.55,   // slow, heavy shots
+  wind: 1.3,     // rapid darts
 };
 
 export const elementRotationSpeedMul = {
   fire: 1.2,     // snappy
   water: 1.0,    // normal
   earth: 0.6,    // heavy and slow to turn
+  wind: 1.5,     // agile
 };
 
 // Alternate-fire abilities (one per element)
-export const abilityCooldown = { fire: 5, water: 5, earth: 6 }; // seconds
+export const abilityCooldown = { fire: 5, water: 5, earth: 6, wind: 5 }; // seconds
 export const fireGrenadeSpeed = 12;
 export const fireGrenadeFuse = 1.2;         // seconds until explosion if it doesn't hit first
 export const fireGrenadeBlastRadius = 6;
@@ -144,6 +150,13 @@ export const earthquakeRadius = 14;
 export const earthquakeDamage = 30;
 export const earthquakeKnockback = 10;
 export const earthquakeDuration = 0.5;      // seconds for the shockwave to expand
+
+// Wind ability: a narrow gust that cuts through enemies
+export const windGustSpeed = 35;
+export const windGustWidth = 3;
+export const windGustRange = 28;
+export const windGustDamage = 12;
+export const windGustKnockback = 12;
 
 // Elemental status effects
 export const burnDamagePerSecond = 5;      // fire damage over time
