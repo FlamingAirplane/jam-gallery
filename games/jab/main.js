@@ -57,47 +57,97 @@ sun.position.set(8, 16, 6);
 scene.add(sun);
 
 // --- Mosaic floor texture ----------------------------------------------------
+// Procedurally drawn, inspired by the warm circular tile motif in the reference.
 function createMosaicTexture() {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
-  const ctx2d = canvas.getContext('2d');
-  const greys = ['#595959', '#6e6e6e', '#7f7f7f', '#8f8f8f', '#a5a5a5'];
+  const c = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
 
-  // Base fill.
-  ctx2d.fillStyle = '#555555';
-  ctx2d.fillRect(0, 0, size, size);
+  const colors = {
+    grout: '#7a4a35',
+    bg: '#a65e46',
+    gold: '#d4a65a',
+    cream: '#f2e6d8',
+    blue: '#5a7a9b',
+    teal: '#3e6b6b',
+    rust: '#8f3d2b',
+  };
 
-  // Random-sized mosaic tiles.
-  const tile = 32;
-  for (let y = 0; y < size; y += tile) {
-    for (let x = 0; x < size; x += tile) {
-      const shade = greys[Math.floor(Math.random() * greys.length)];
-      ctx2d.fillStyle = shade;
-      ctx2d.fillRect(x + 1, y + 1, tile - 2, tile - 2);
+  // Tile background and grout.
+  c.fillStyle = colors.bg;
+  c.fillRect(0, 0, size, size);
+  c.strokeStyle = colors.grout;
+  c.lineWidth = 3;
+  c.strokeRect(0, 0, size, size);
 
-      // Occasional smaller inset tile.
-      if (Math.random() < 0.25) {
-        ctx2d.fillStyle = greys[Math.floor(Math.random() * greys.length)];
-        const inset = tile * 0.25;
-        ctx2d.fillRect(x + inset, y + inset, tile - inset * 2, tile - inset * 2);
-      }
+  // Helper for mosaic-looking rings.
+  function ring(x, y, r, width, color) {
+    c.beginPath();
+    c.arc(x, y, r, 0, Math.PI * 2);
+    c.strokeStyle = color;
+    c.lineWidth = width;
+    c.stroke();
+  }
+  function disc(x, y, r, color) {
+    c.beginPath();
+    c.arc(x, y, r, 0, Math.PI * 2);
+    c.fillStyle = color;
+    c.fill();
+  }
+  function petal(x, y, angle, len, color) {
+    c.save();
+    c.translate(x, y);
+    c.rotate(angle);
+    c.beginPath();
+    c.ellipse(0, -len * 0.4, len * 0.22, len * 0.55, 0, 0, Math.PI * 2);
+    c.fillStyle = color;
+    c.fill();
+    c.restore();
+  }
 
-      // Dark grout / cracks.
-      ctx2d.strokeStyle = '#3a3a3a';
-      ctx2d.lineWidth = 1;
-      ctx2d.strokeRect(x, y, tile, tile);
+  // Corner quarter medallions (shared with neighbouring tiles).
+  const corners = [[0, 0], [size, 0], [0, size], [size, size]];
+  for (const [x, y] of corners) {
+    disc(x, y, size * 0.18, colors.rust);
+    ring(x, y, size * 0.18, 4, colors.gold);
+    ring(x, y, size * 0.13, 3, colors.cream);
+    disc(x, y, size * 0.07, colors.blue);
+  }
 
-      // Random crack line.
-      if (Math.random() < 0.08) {
-        ctx2d.beginPath();
-        ctx2d.moveTo(x + Math.random() * tile, y + Math.random() * tile);
-        ctx2d.lineTo(x + Math.random() * tile, y + Math.random() * tile);
-        ctx2d.strokeStyle = '#2a2a2a';
-        ctx2d.stroke();
-      }
-    }
+  // Central medallion.
+  disc(cx, cy, size * 0.42, colors.rust);
+  ring(cx, cy, size * 0.42, 5, colors.gold);
+  ring(cx, cy, size * 0.35, 4, colors.cream);
+  disc(cx, cy, size * 0.28, colors.bg);
+  ring(cx, cy, size * 0.28, 3, colors.gold);
+
+  // Petals around the centre.
+  const petals = 8;
+  for (let i = 0; i < petals; i++) {
+    const a = (i / petals) * Math.PI * 2;
+    petal(cx, cy, a, size * 0.26, i % 2 === 0 ? colors.cream : colors.gold);
+  }
+
+  // Inner flower.
+  disc(cx, cy, size * 0.12, colors.blue);
+  ring(cx, cy, size * 0.12, 3, colors.cream);
+  disc(cx, cy, size * 0.05, colors.teal);
+
+  // Small diamond accents in the tile gaps.
+  c.fillStyle = colors.cream;
+  const d = size * 0.08;
+  for (const [sx, sy] of [[cx, 0], [cx, size], [0, cy], [size, cy]]) {
+    c.beginPath();
+    c.moveTo(sx, sy - d);
+    c.lineTo(sx + d, sy);
+    c.lineTo(sx, sy + d);
+    c.lineTo(sx - d, sy);
+    c.closePath();
+    c.fill();
   }
 
   const texture = new THREE.CanvasTexture(canvas);
