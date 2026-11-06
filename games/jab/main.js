@@ -14,12 +14,12 @@ import {
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=2';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=3';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
-} from './enemies.js?v=2';
+} from './enemies.js?v=3';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
 import {
