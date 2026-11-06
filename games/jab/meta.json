@@ -2,6 +2,27 @@
   "title": "Golem in the Moon Dungeon",
   "handle": "jab",
   "description": "Aim and fire as a non-elemental golem descending a dungeon on the moon, absorbing one element at a time from glowing fields.",
-  "assets": [],
-  "ai_assets": ["assets/golem.glb", "assets/make_golem.py"]
+  "assets": [
+    {
+      "file": "assets/golem.glb",
+      "source": "Flow Studio (created by the team with Pro plan)",
+      "license": "Flow Studio Pro - full commercial use permitted"
+    },
+    {
+      "file": "assets/enemy_fire.glb",
+      "source": "Flow Studio (created by the team with Pro plan)",
+      "license": "Flow Studio Pro - full commercial use permitted"
+    },
+    {
+      "file": "assets/enemy_earth.glb",
+      "source": "Flow Studio (created by the team with Pro plan)",
+      "license": "Flow Studio Pro - full commercial use permitted"
+    },
+    {
+      "file": "assets/enemy_water.glb",
+      "source": "Flow Studio (created by the team with Pro plan)",
+      "license": "Flow Studio Pro - full commercial use permitted"
+    }
+  ],
+  "ai_assets": ["assets/make_golem.py", "assets/make_flow_models.py"]
 }

@@ -43,7 +43,7 @@ let projectileGeometry = null; // one shared sphere, made on first shot
 // Try to load the Blender-exported golem model; fall back to procedural boxes if it fails.
 let golemTemplate = null;
 try {
-  golemTemplate = await new GLTFLoader().loadAsync('assets/golem.glb?v=4');
+  golemTemplate = await new GLTFLoader().loadAsync('assets/golem.glb?v=5');
 } catch (err) {
   console.warn('Golem model not loaded, using procedural fallback', err);
 }
@@ -157,7 +157,10 @@ export function setElement(player, type) {
   const base = new THREE.Color(GOLEM_COLOR);
   player.group.traverse((child) => {
     if (child.isMesh && child.material) {
-      child.material.color.copy(base);
+      // Keep textured materials looking like their baked texture; recolour only plain materials.
+      if (!child.material.map) {
+        child.material.color.copy(base);
+      }
       child.material.emissive.copy(glow);
       child.material.emissiveIntensity = 0.55;
     }

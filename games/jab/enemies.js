@@ -5,7 +5,9 @@ import {
   enemyRoleWeights, archerSpeed, archerPreferredRange, archerRangeTolerance,
   archerFireRate, archerProjectileSpeed, archerProjectileDamage,
   archerProjectileRadius, archerProjectileRange,
+  brawlerModelScale, archerModelScale,
 } from './tuning.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const BRAWLER_COLOR = '#4a4a4a';
 const ARCHER_COLOR = '#6a5a4a';
@@ -15,6 +17,26 @@ let shotScene = null;
 let brawlerGeometry = null;
 let archerGeometry = null;
 let enemyProjectileGeometry = null;
+
+// Load Flow Studio enemy models; fall back to procedural geometry if any fail.
+const enemyTemplates = { fire: null, earth: null, water: null };
+async function loadEnemyModel(element) {
+  try {
+    const gltf = await new GLTFLoader().loadAsync(`assets/enemy_${element}.glb?v=1`);
+    enemyTemplates[element] = gltf;
+  } catch (err) {
+    console.warn(`Enemy ${element} model not loaded, using procedural fallback`, err);
+  }
+}
+await Promise.all(['fire', 'earth', 'water'].map(loadEnemyModel));
+
+function pickBrawlerTemplate() {
+  return Math.random() < 0.5 ? enemyTemplates.fire : enemyTemplates.earth;
+}
+
+function pickArcherTemplate() {
+  return enemyTemplates.water;
+}
 
 function pickRole() {
   const roll = Math.random();
@@ -43,12 +65,24 @@ export function spawnEnemyAt(scene, position, role = null) {
   shotScene = scene;
   const chosenRole = role ?? pickRole();
   const isArcher = chosenRole === 'archer';
-  const geometry = isArcher ? getArcherGeometry() : getBrawlerGeometry();
-  const color = isArcher ? ARCHER_COLOR : BRAWLER_COLOR;
-  const mesh = new THREE.Mesh(
-    geometry,
-    new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.2, flatShading: true })
-  );
+  let mesh;
+  if (isArcher) {
+    const tmpl = pickArcherTemplate();
+    if (tmpl) {
+      mesh = tmpl.scene.clone();
+      mesh.scale.setScalar(archerModelScale);
+    } else {
+      mesh = new THREE.Mesh(getArcherGeometry(), new THREE.MeshStandardMaterial({ color: ARCHER_COLOR, roughness: 0.9, metalness: 0.2, flatShading: true }));
+    }
+  } else {
+    const tmpl = pickBrawlerTemplate();
+    if (tmpl) {
+      mesh = tmpl.scene.clone();
+      mesh.scale.setScalar(brawlerModelScale);
+    } else {
+      mesh = new THREE.Mesh(getBrawlerGeometry(), new THREE.MeshStandardMaterial({ color: BRAWLER_COLOR, roughness: 0.9, metalness: 0.2, flatShading: true }));
+    }
+  }
   mesh.position.copy(position);
   mesh.position.y = 0;
   mesh.rotation.y = Math.random() * Math.PI;
@@ -176,6 +210,7 @@ export function updateEnemies(dt, targetPos) {
         const travel = Math.min(step, distance);
         position.x += (dx / distance) * travel;
         position.z += (dz / distance) * travel;
+        enemy.mesh.rotation.y = Math.atan2(dx, dz);
       }
     }
 
