@@ -8,9 +8,7 @@ import {
   cameraHeight, cameraDistance, cameraFollowSpeed, cameraAngle, elementFieldCount,
   screenShakeAmount, screenShakeDecay, elementColors,
   spawnMargin, minSpawnDistance, spawnIndicatorDuration,
-  columnCount, columnRadius, columnMinDistanceFromPlayer,
-  wallHeight, wallThickness,
-  internalWallCount, internalWallLength, internalWallThickness,
+  columnRadius,
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
 } from './tuning.js';
@@ -22,6 +20,7 @@ import {
 } from './enemies.js?v=3';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
+import { buildMap } from './level.js?v=2';
 import {
   createUI, setScore, setFloor, setWave, setHealth, showGameOver, hideGameOver,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
@@ -117,366 +116,27 @@ const grid = new THREE.GridHelper(arenaSize * 2, arenaSize, '#f2f2f2', '#a5a5a5'
 grid.position.y = 0.02;
 scene.add(grid);
 
-// --- Procedural stone textures for walls and columns -------------------------
-function createStoneTexture() {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const c = canvas.getContext('2d');
-  c.fillStyle = '#5c5c5c';
-  c.fillRect(0, 0, size, size);
-  // mottled noise
-  for (let i = 0; i < 60000; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const shade = Math.random() < 0.5 ? '#666666' : '#525252';
-    c.fillStyle = shade;
-    c.fillRect(x, y, 2, 2);
-  }
-  // large block mortar lines
-  c.strokeStyle = '#3a3a3a';
-  c.lineWidth = 2;
-  const blocks = 4;
-  const step = size / blocks;
-  for (let i = 1; i < blocks; i++) {
-    c.beginPath();
-    c.moveTo(i * step, 0);
-    c.lineTo(i * step, size);
-    c.stroke();
-    c.beginPath();
-    c.moveTo(0, i * step);
-    c.lineTo(size, i * step);
-    c.stroke();
-  }
-  // cracks
-  for (let i = 0; i < 12; i++) {
-    c.beginPath();
-    let x = Math.random() * size;
-    let y = Math.random() * size;
-    c.moveTo(x, y);
-    for (let j = 0; j < 6; j++) {
-      x += (Math.random() - 0.5) * 80;
-      y += (Math.random() - 0.5) * 80;
-      c.lineTo(x, y);
-    }
-    c.strokeStyle = Math.random() < 0.5 ? '#2a2a2a' : '#707070';
-    c.lineWidth = 1;
-    c.stroke();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
+// --- Level layout (inspired by Map_Base.png) ---------------------------------
+let walls = [];
+let columnMeshes = [];
 
-function createStoneBumpMap() {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const c = canvas.getContext('2d');
-  c.fillStyle = '#808080';
-  c.fillRect(0, 0, size, size);
-  for (let i = 0; i < 30000; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const v = Math.floor(Math.random() * 60 + 90).toString(16).padStart(2, '0');
-    c.fillStyle = `#${v}${v}${v}`;
-    c.fillRect(x, y, 2, 2);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
-
-const stoneTexture = createStoneTexture();
-const stoneBump = createStoneBumpMap();
-const wallMaterial = new THREE.MeshStandardMaterial({
-  map: stoneTexture,
-  bumpMap: stoneBump,
-  bumpScale: 0.05,
-  roughness: 0.92,
-  color: '#8e8e8e',
-});
-
-const walls = [];
-function addWall(x, z, w, d) {
-  const u = w / 8;
-  const v = d / 8;
-  const texture = stoneTexture.clone();
-  texture.repeat.set(Math.max(1, Math.round(u)), Math.max(1, Math.round(v)));
-  const bump = stoneBump.clone();
-  bump.repeat.set(Math.max(1, Math.round(u)), Math.max(1, Math.round(v)));
-  const material = wallMaterial.clone();
-  material.map = texture;
-  material.bumpMap = bump;
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, wallHeight, d), material);
-  mesh.position.set(x, wallHeight / 2, z);
-  scene.add(mesh);
-  walls.push({ x, z, halfW: w / 2, halfD: d / 2 });
-}
-function createWalls(scene) {
-  const half = arenaSize + wallThickness / 2;
-  const long = arenaSize * 2 + wallThickness * 2;
-  addWall(0, -half, long, wallThickness);
-  addWall(0, half, long, wallThickness);
-  addWall(-half, 0, wallThickness, long);
-  addWall(half, 0, wallThickness, long);
-
-  // Internal walls to break up the arena.
-  for (let i = 0; i < internalWallCount; i++) {
-    const horizontal = Math.random() < 0.5;
-    const wx = (Math.random() * 2 - 1) * (arenaSize - internalWallLength - 4);
-    const wz = (Math.random() * 2 - 1) * (arenaSize - internalWallThickness - 4);
-    if (horizontal) {
-      addWall(wx, wz, internalWallLength, internalWallThickness);
-    } else {
-      addWall(wx, wz, internalWallThickness, internalWallLength);
-    }
-  }
-}
-createWalls(scene);
-
-// --- Input -------------------------------------------------------------------
-// Keys are held under several spellings ('Space'/'space'/' ', 'KeyW'/'keyw'/'w')
-// so player.js can look up whichever it checks for.
-const keys = new Set();
-const mouseNDC = { x: 0, y: 0 };
-const ctx = { keys, mouseNDC, camera, arenaSize, mouseDown: false };
-
-const spellings = (event) => [event.code, event.key, event.key.toLowerCase(), event.code.toLowerCase()];
-
-// The left button is reported to player.js both as ctx.mouseDown and as a key token.
-const MOUSE_TOKENS = ['mouse', 'Mouse0', 'mouse0', 'MouseLeft', 'mouseleft', 'Primary', 'primary', 'Fire'];
-
-let musicStarted = false;
-function tryStartMusic() {
-  if (!musicStarted) {
-    musicStarted = true;
-    startMusic();
-  }
-}
-
-function setMouseDown(down) {
-  ctx.mouseDown = down;
-  for (const token of MOUSE_TOKENS) {
-    if (down) keys.add(token); else keys.delete(token);
-  }
-}
-
-addEventListener('keydown', (event) => {
-  if (event.code === 'Space' || event.code.startsWith('Arrow')) event.preventDefault();
-  for (const token of spellings(event)) keys.add(token);
-  if (event.code === 'KeyM') {
-    const muted = toggleMusic();
-    ui.setMusicMuted(muted);
-  }
-  if (state === 'gameover' && event.key.toLowerCase() === 'r') restart();
-  tryStartMusic();
-});
-addEventListener('keyup', (event) => { for (const token of spellings(event)) keys.delete(token); });
-
-addEventListener('mousedown', (event) => {
-  if (event.button === 0) {
-    setMouseDown(true);
-    resumeAudio();
-    tryStartMusic();
-  }
-});
-addEventListener('mouseup', (event) => { if (event.button === 0) setMouseDown(false); });
-addEventListener('blur', () => setMouseDown(false));
-
-addEventListener('pointermove', (event) => {
-  mouseNDC.x = (event.clientX / innerWidth) * 2 - 1;
-  mouseNDC.y = -(event.clientY / innerHeight) * 2 + 1;
-});
-
-// Touch support: tap/ drag anywhere to aim and fire.
-addEventListener('touchstart', (event) => {
-  if (event.target.tagName === 'BUTTON') return;
-  const t = event.touches[0];
-  mouseNDC.x = (t.clientX / innerWidth) * 2 - 1;
-  mouseNDC.y = -(t.clientY / innerHeight) * 2 + 1;
-  setMouseDown(true);
-  tryStartMusic();
-}, { passive: false });
-addEventListener('touchmove', (event) => {
-  event.preventDefault();
-  const t = event.touches[0];
-  mouseNDC.x = (t.clientX / innerWidth) * 2 - 1;
-  mouseNDC.y = -(t.clientY / innerHeight) * 2 + 1;
-}, { passive: false });
-addEventListener('touchend', () => setMouseDown(false));
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-
-// --- Optional FPS panel ------------------------------------------------------
-const urlParams = new URLSearchParams(location.search);
-const showFps = urlParams.has('fps');
-let fpsPanel = null;
-if (showFps) {
-  fpsPanel = document.createElement('div');
-  Object.assign(fpsPanel.style, {
-    position: 'fixed', right: '12px', top: '12px', zIndex: '20',
-    padding: '8px 12px', background: 'rgba(0,0,0,0.6)', color: '#f2f2f2',
-    font: '13px/1.4 monospace', pointerEvents: 'none',
-  });
-  fpsPanel.textContent = 'FPS: --';
-  document.body.appendChild(fpsPanel);
-}
-
-// --- Game state --------------------------------------------------------------
-const player = createPlayer(scene);
-const maxHp = () => player.maxHp ?? playerHP;
-const columnMeshes = [];
-
-let state = 'playing';       // 'playing' | 'gameover'
-let score = 0;               // enemies killed
-let floor = 1;               // the descent itself arrives in M2
-let waveInFloor = 1;         // current wave out of wavesPerFloor
-let contactTimer = 0;
-let waveTimer = 0;
-let shownHp = null;
-let screenShake = 0;
-const activeSpawnIndicators = [];
-
-const alive = (thing) => thing.alive !== false;   // treat a missing flag as alive
-const liveEnemies = () => getEnemies().filter(alive).length;
-const distanceXZ = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-
-function attachHealthBars() {
-  for (const enemy of getEnemies()) {
-    if (!enemy.healthBar) {
-      enemy.healthBar = createEnemyHealthBar();
-      enemy.healthBar.setHp(enemy.hp, enemyHP);
-    }
-  }
-}
-
-function clearSpawnIndicators() {
-  for (const ind of activeSpawnIndicators) ind.remove();
-  activeSpawnIndicators.length = 0;
-}
-
-function addSpawnIndicator(spawnPos) {
-  const ind = createSpawnIndicator();
-  positionSpawnIndicator(ind.element, spawnPos, camera, renderer);
-  activeSpawnIndicators.push(ind);
-  setTimeout(() => {
-    ind.remove();
-    const i = activeSpawnIndicators.indexOf(ind);
-    if (i >= 0) activeSpawnIndicators.splice(i, 1);
-  }, spawnIndicatorDuration * 1000);
-}
-
-function spawnWaveCustom(scene, count) {
-  const playerPos = player.group.position;
-  const camDir = new THREE.Vector3();
-  camera.getWorldDirection(camDir);
-  camDir.y = 0;
-  if (camDir.lengthSq() > 0) camDir.normalize();
-  const behind = camDir.clone().negate();
-  const perp = new THREE.Vector3(-camDir.z, 0, camDir.x);
-
-  const spawnDistance = minSpawnDistance + spawnMargin;
-  const spread = minSpawnDistance * 0.6;
-
-  for (let i = 0; i < count; i++) {
-    const lateral = (Math.random() * 2 - 1) * spread;
-    const spawnPos = new THREE.Vector3()
-      .copy(playerPos)
-      .addScaledVector(behind, spawnDistance)
-      .addScaledVector(perp, lateral);
-    spawnPos.x = Math.max(-arenaSize, Math.min(arenaSize, spawnPos.x));
-    spawnPos.z = Math.max(-arenaSize, Math.min(arenaSize, spawnPos.z));
-    spawnPos.y = 0;
-
-    spawnEnemyAt(scene, spawnPos);
-    addSpawnIndicator(spawnPos);
-  }
-}
-
-function clearColumns() {
+function clearLevel() {
   for (const mesh of columnMeshes) {
     if (mesh.parent) mesh.parent.remove(mesh);
   }
   columnMeshes.length = 0;
+  // Wall meshes are owned by level.js; we rebuild them on restart.
 }
 
-function createColumnMesh() {
-  const shaftHeight = 4;
-  const shaftGeo = new THREE.CylinderGeometry(columnRadius * 0.8, columnRadius * 0.85, shaftHeight, 16);
-  shaftGeo.translate(0, shaftHeight / 2, 0);
-  const baseGeo = new THREE.CylinderGeometry(columnRadius * 1.1, columnRadius * 1.2, 0.3, 16);
-  baseGeo.translate(0, 0.15, 0);
-  const capGeo = new THREE.CylinderGeometry(columnRadius * 1.1, columnRadius * 0.9, 0.3, 16);
-  capGeo.translate(0, shaftHeight - 0.15, 0);
-
-  const columnTexture = stoneTexture.clone();
-  columnTexture.repeat.set(1, 1);
-  const columnBump = stoneBump.clone();
-  columnBump.repeat.set(1, 1);
-  const material = new THREE.MeshStandardMaterial({
-    map: columnTexture,
-    bumpMap: columnBump,
-    bumpScale: 0.04,
-    roughness: 0.9,
-    color: '#8e8e8e',
-  });
-
-  const group = new THREE.Group();
-  const shaft = new THREE.Mesh(shaftGeo, material);
-  const base = new THREE.Mesh(baseGeo, material);
-  const cap = new THREE.Mesh(capGeo, material);
-  group.add(shaft, base, cap);
-  return group;
+function createLevel(scene) {
+  clearLevel();
+  const level = buildMap(scene);
+  walls = level.walls;
+  columnMeshes.push(...level.columns);
 }
 
-function createColumns(scene, count) {
-  clearColumns();
-  const positions = [];
-  const playerStart = new THREE.Vector3(0, 0, 0);
+createLevel(scene);
 
-  for (let i = 0; i < count; i++) {
-    let pos = null;
-    let attempts = 0;
-    while (attempts < 30) {
-      const x = (Math.random() * 2 - 1) * (arenaSize - columnRadius - 2);
-      const z = (Math.random() * 2 - 1) * (arenaSize - columnRadius - 2);
-      const candidate = new THREE.Vector3(x, 2, z);
-      if (distanceXZ(candidate, playerStart) < columnMinDistanceFromPlayer) {
-        attempts++;
-        continue;
-      }
-      let tooClose = false;
-      for (const other of positions) {
-        if (distanceXZ(candidate, other) < columnRadius * 4) {
-          tooClose = true;
-          break;
-        }
-      }
-      if (!tooClose) {
-        pos = candidate;
-        break;
-      }
-      attempts++;
-    }
-    if (!pos) continue;
-    positions.push(pos);
-    const column = createColumnMesh();
-    column.position.copy(pos);
-    column.position.y = 0;
-    scene.add(column);
-    columnMeshes.push(column);
-  }
-}
 
 function resolveColumnCollisions(position, radius) {
   for (const mesh of columnMeshes) {
@@ -548,7 +208,7 @@ function restart() {
     if (shot.mesh) scene.remove(shot.mesh);
   }
   clearElementFields();
-  clearColumns();
+  clearLevel();
   clearEnemyProjectiles();
   clearFX();
   screenShake = 0;
@@ -563,7 +223,7 @@ function restart() {
   waveTimer = spawnInterval;
   shownHp = player.hp;
   setMouseDown(false);
-  createColumns(scene, columnCount);
+  createLevel(scene);
   spawnWaveCustom(scene, waveSize);
   attachHealthBars();
   spawnElementFields(scene, elementFieldCount);
@@ -834,7 +494,7 @@ renderer.setAnimationLoop(() => {
   }
 });
 
-createColumns(scene, columnCount);
+createLevel(scene);
 spawnWaveCustom(scene, waveSize);
 attachHealthBars();
 waveTimer = spawnInterval;
