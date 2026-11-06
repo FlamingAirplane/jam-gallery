@@ -14,7 +14,7 @@ import {
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=5';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=6';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,

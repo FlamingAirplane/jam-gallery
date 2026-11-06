@@ -10,7 +10,6 @@ import {
   projectileRange,
   projectileRadius,
   arenaSize,
-  elementColors,
   fireProjectileSpeed,
   waterProjectileSpeed,
   earthProjectileSpeed,
@@ -162,12 +161,11 @@ export function setElement(player, type) {
     attachModelForElement(player.group, type);
   }
   player.element = type;
-  const glow = new THREE.Color(elementColors[type] ?? GOLEM_COLOR);
   player.group.traverse((child) => {
     if (child.isMesh && child.material) {
-      // Keep textured materials looking like their baked texture.
-      child.material.emissive.copy(glow);
-      child.material.emissiveIntensity = 0.55;
+      // Keep the baked texture; no elemental tint.
+      child.material.emissive.setHex(0x000000);
+      child.material.emissiveIntensity = 0;
       // Remove specular sheen.
       child.material.roughness = 1;
       child.material.metalness = 0;
