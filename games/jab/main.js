@@ -20,7 +20,7 @@ import {
 } from './enemies.js?v=3';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
-import { buildMap } from './level.js?v=2';
+import { buildMap } from './level.js?v=3';
 import {
   createUI, setScore, setFloor, setWave, setHealth, showGameOver, hideGameOver,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
@@ -125,7 +125,6 @@ function clearLevel() {
     if (mesh.parent) mesh.parent.remove(mesh);
   }
   columnMeshes.length = 0;
-  // Wall meshes are owned by level.js; we rebuild them on restart.
 }
 
 function createLevel(scene) {
@@ -137,6 +136,167 @@ function createLevel(scene) {
 
 createLevel(scene);
 
+// --- Input -------------------------------------------------------------------
+// Keys are held under several spellings ('Space'/'space'/' ', 'KeyW'/'keyw'/'w')
+// so player.js can look up whichever it checks for.
+const keys = new Set();
+const mouseNDC = { x: 0, y: 0 };
+const ctx = { keys, mouseNDC, camera, arenaSize, mouseDown: false };
+
+const spellings = (event) => [event.code, event.key, event.key.toLowerCase(), event.code.toLowerCase()];
+
+// The left button is reported to player.js both as ctx.mouseDown and as a key token.
+const MOUSE_TOKENS = ['mouse', 'Mouse0', 'mouse0', 'MouseLeft', 'mouseleft', 'Primary', 'primary', 'Fire'];
+
+let musicStarted = false;
+function tryStartMusic() {
+  if (!musicStarted) {
+    musicStarted = true;
+    startMusic();
+  }
+}
+
+function setMouseDown(down) {
+  ctx.mouseDown = down;
+  for (const token of MOUSE_TOKENS) {
+    if (down) keys.add(token); else keys.delete(token);
+  }
+}
+
+addEventListener('keydown', (event) => {
+  if (event.code === 'Space' || event.code.startsWith('Arrow')) event.preventDefault();
+  for (const token of spellings(event)) keys.add(token);
+  if (event.code === 'KeyM') {
+    const muted = toggleMusic();
+    ui.setMusicMuted(muted);
+  }
+  if (state === 'gameover' && event.key.toLowerCase() === 'r') restart();
+  tryStartMusic();
+});
+addEventListener('keyup', (event) => { for (const token of spellings(event)) keys.delete(token); });
+
+addEventListener('mousedown', (event) => {
+  if (event.button === 0) {
+    setMouseDown(true);
+    resumeAudio();
+    tryStartMusic();
+  }
+});
+addEventListener('mouseup', (event) => { if (event.button === 0) setMouseDown(false); });
+addEventListener('blur', () => setMouseDown(false));
+
+addEventListener('pointermove', (event) => {
+  mouseNDC.x = (event.clientX / innerWidth) * 2 - 1;
+  mouseNDC.y = -(event.clientY / innerHeight) * 2 + 1;
+});
+
+// Touch support: tap/ drag anywhere to aim and fire.
+addEventListener('touchstart', (event) => {
+  if (event.target.tagName === 'BUTTON') return;
+  const t = event.touches[0];
+  mouseNDC.x = (t.clientX / innerWidth) * 2 - 1;
+  mouseNDC.y = -(t.clientY / innerHeight) * 2 + 1;
+  setMouseDown(true);
+  tryStartMusic();
+}, { passive: false });
+addEventListener('touchmove', (event) => {
+  event.preventDefault();
+  const t = event.touches[0];
+  mouseNDC.x = (t.clientX / innerWidth) * 2 - 1;
+  mouseNDC.y = -(t.clientY / innerHeight) * 2 + 1;
+}, { passive: false });
+addEventListener('touchend', () => setMouseDown(false));
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// --- Optional FPS panel ------------------------------------------------------
+const urlParams = new URLSearchParams(location.search);
+const showFps = urlParams.has('fps');
+let fpsPanel = null;
+if (showFps) {
+  fpsPanel = document.createElement('div');
+  Object.assign(fpsPanel.style, {
+    position: 'fixed', right: '12px', top: '12px', zIndex: '20',
+    padding: '8px 12px', background: 'rgba(0,0,0,0.6)', color: '#f2f2f2',
+    font: '13px/1.4 monospace', pointerEvents: 'none',
+  });
+  fpsPanel.textContent = 'FPS: --';
+  document.body.appendChild(fpsPanel);
+}
+
+// --- Game state --------------------------------------------------------------
+const player = createPlayer(scene);
+const maxHp = () => player.maxHp ?? playerHP;
+
+let state = 'playing';       // 'playing' | 'gameover'
+let score = 0;               // enemies killed
+let floor = 1;               // the descent itself arrives in M2
+let waveInFloor = 1;         // current wave out of wavesPerFloor
+let contactTimer = 0;
+let waveTimer = 0;
+let shownHp = null;
+let screenShake = 0;
+const activeSpawnIndicators = [];
+
+const alive = (thing) => thing.alive !== false;   // treat a missing flag as alive
+const liveEnemies = () => getEnemies().filter(alive).length;
+const distanceXZ = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+
+function attachHealthBars() {
+  for (const enemy of getEnemies()) {
+    if (!enemy.healthBar) {
+      enemy.healthBar = createEnemyHealthBar();
+      enemy.healthBar.setHp(enemy.hp, enemyHP);
+    }
+  }
+}
+
+function clearSpawnIndicators() {
+  for (const ind of activeSpawnIndicators) ind.remove();
+  activeSpawnIndicators.length = 0;
+}
+
+function addSpawnIndicator(spawnPos) {
+  const ind = createSpawnIndicator();
+  positionSpawnIndicator(ind.element, spawnPos, camera, renderer);
+  activeSpawnIndicators.push(ind);
+  setTimeout(() => {
+    ind.remove();
+    const i = activeSpawnIndicators.indexOf(ind);
+    if (i >= 0) activeSpawnIndicators.splice(i, 1);
+  }, spawnIndicatorDuration * 1000);
+}
+
+function spawnWaveCustom(scene, count) {
+  const playerPos = player.group.position;
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  camDir.y = 0;
+  if (camDir.lengthSq() > 0) camDir.normalize();
+  const behind = camDir.clone().negate();
+  const perp = new THREE.Vector3(-camDir.z, 0, camDir.x);
+
+  const spawnDistance = minSpawnDistance + spawnMargin;
+  const spread = minSpawnDistance * 0.6;
+
+  for (let i = 0; i < count; i++) {
+    const lateral = (Math.random() * 2 - 1) * spread;
+    const spawnPos = new THREE.Vector3()
+      .copy(playerPos)
+      .addScaledVector(behind, spawnDistance)
+      .addScaledVector(perp, lateral);
+    spawnPos.x = Math.max(-arenaSize, Math.min(arenaSize, spawnPos.x));
+    spawnPos.z = Math.max(-arenaSize, Math.min(arenaSize, spawnPos.z));
+    spawnPos.y = 0;
+
+    spawnEnemyAt(scene, spawnPos);
+    addSpawnIndicator(spawnPos);
+  }
+}
 
 function resolveColumnCollisions(position, radius) {
   for (const mesh of columnMeshes) {

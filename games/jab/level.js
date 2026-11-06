@@ -1,7 +1,7 @@
 // level.js — a designed dungeon layout inspired by Map_Base.png.
 // No image is copied; the layout is rebuilt from simple shapes.
 import * as THREE from 'three';
-import { arenaSize, wallHeight, wallThickness, columnRadius } from './tuning.js';
+import { arenaSize, wallHeight, columnRadius } from './tuning.js';
 
 const STONE_COLOR = '#8e8e8e';
 
