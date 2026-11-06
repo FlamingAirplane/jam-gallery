@@ -9,7 +9,9 @@ import {
   mageSpeed, magePreferredRange, mageRangeTolerance,
   mageFireRate, mageProjectileSpeed, mageProjectileDamage,
   mageProjectileRadius, mageProjectileRange,
-  brawlerModelScale, archerModelScale, mageModelScale,
+  healerSpeed, healerPreferredRange, healerRangeTolerance,
+  healerHealRange, healerHealAmount, healerHealRate,
+  brawlerModelScale, archerModelScale, mageModelScale, healerModelScale,
   leaderAuraRadius, leaderSpeedMul, heroHpMul, heroSpeedMul, cowardFleeHpRatio,
   burnDamagePerSecond, burnDuration,
   earthSlowMul, earthSlowDuration,
@@ -19,6 +21,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const BRAWLER_COLOR = '#4a4a4a';
 const ARCHER_COLOR = '#6a5a4a';
 const MAGE_COLOR = '#8e44ad';
+const HEALER_COLOR = '#2ecc71';
 const PERSONALITY_TINT = {
   leader: '#ffd700',
   hero: '#e74c3c',
@@ -31,6 +34,7 @@ let shotScene = null;
 let brawlerGeometry = null;
 let archerGeometry = null;
 let mageGeometry = null;
+let healerGeometry = null;
 let enemyProjectileGeometry = null;
 
 // Load Flow Studio enemy models; fall back to procedural geometry if any fail.
@@ -57,11 +61,18 @@ function pickMageTemplate() {
   return enemyTemplates.water;
 }
 
+function pickHealerTemplate() {
+  return enemyTemplates.water;
+}
+
 function pickRole() {
   const roll = Math.random();
-  if (roll < enemyRoleWeights.brawler) return 'brawler';
-  if (roll < enemyRoleWeights.brawler + enemyRoleWeights.archer) return 'archer';
-  return 'mage';
+  let sum = 0;
+  for (const [key, weight] of Object.entries(enemyRoleWeights)) {
+    sum += weight;
+    if (roll < sum) return key;
+  }
+  return 'brawler';
 }
 
 function pickPersonality() {
@@ -101,6 +112,15 @@ function getMageGeometry() {
   return mageGeometry;
 }
 
+function getHealerGeometry() {
+  if (!healerGeometry) {
+    // A floating orb for healers.
+    healerGeometry = new THREE.IcosahedronGeometry(enemyRadius * 0.8, 1);
+    healerGeometry.translate(0, enemyRadius * 1.4, 0);
+  }
+  return healerGeometry;
+}
+
 export function spawnEnemyAt(scene, position, role = null) {
   shotScene = scene;
   const chosenRole = role ?? pickRole();
@@ -122,6 +142,14 @@ export function spawnEnemyAt(scene, position, role = null) {
       mesh.scale.setScalar(mageModelScale);
     } else {
       mesh = new THREE.Mesh(getMageGeometry(), new THREE.MeshStandardMaterial({ color: MAGE_COLOR, roughness: 0.6, metalness: 0.3, flatShading: true }));
+    }
+  } else if (chosenRole === 'healer') {
+    const tmpl = pickHealerTemplate();
+    if (tmpl) {
+      mesh = tmpl.scene.clone();
+      mesh.scale.setScalar(healerModelScale);
+    } else {
+      mesh = new THREE.Mesh(getHealerGeometry(), new THREE.MeshStandardMaterial({ color: HEALER_COLOR, roughness: 0.6, metalness: 0.2, flatShading: true }));
     }
   } else {
     const tmpl = pickBrawlerTemplate();
@@ -164,6 +192,7 @@ export function spawnEnemyAt(scene, position, role = null) {
     role: chosenRole,
     personality,
     fireTimer: Math.random() * 0.8,
+    healTimer: Math.random() * (1 / healerHealRate),
     burnTimer: 0,
     slowTimer: 0,
     scatterTimer: 0,
@@ -250,6 +279,8 @@ export function clearEnemyProjectiles() {
 }
 
 export function updateEnemies(dt, targetPos) {
+  const alive = (e) => e.alive !== false;
+
   // Drop the ones killed last frame first, in place.
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (enemies[i].alive) continue;
@@ -284,6 +315,9 @@ export function updateEnemies(dt, targetPos) {
       if (d < bestD) { bestD = d; best = other; }
     }
     return best;
+  }
+  function nearestDamagedAlly(enemy, maxDist) {
+    return nearestAlly(enemy, maxDist, (o) => o.hp < o.maxHp);
   }
 
   for (const enemy of enemies) {
@@ -324,11 +358,12 @@ export function updateEnemies(dt, targetPos) {
     const scattering = enemy.personality === 'grunt' && !anyLeaderAlive && enemy.scatterTimer <= 0;
     if (scattering) enemy.scatterTimer = 2;
 
-    if (enemy.role === 'archer' || enemy.role === 'mage') {
+    if (enemy.role === 'archer' || enemy.role === 'mage' || enemy.role === 'healer') {
       const isMage = enemy.role === 'mage';
-      const prefRange = isMage ? magePreferredRange : archerPreferredRange;
-      const rangeTol = isMage ? mageRangeTolerance : archerRangeTolerance;
-      const moveSpeed = (isMage ? mageSpeed : archerSpeed) * speedMul;
+      const isHealer = enemy.role === 'healer';
+      const prefRange = isHealer ? healerPreferredRange : (isMage ? magePreferredRange : archerPreferredRange);
+      const rangeTol = isHealer ? healerRangeTolerance : (isMage ? mageRangeTolerance : archerRangeTolerance);
+      const moveSpeed = (isHealer ? healerSpeed : (isMage ? mageSpeed : archerSpeed)) * speedMul;
       const fireRate = isMage ? mageFireRate : archerFireRate;
 
       let moveDirX = 0;
@@ -365,17 +400,33 @@ export function updateEnemies(dt, targetPos) {
         enemy.mesh.rotation.y = Math.atan2(dx, dz);
       }
 
-      // Fire when roughly in range and not fleeing/scattering/hiding.
-      enemy.fireTimer -= dt;
-      if (!fleeing && !cowardHiding && enemy.scatterTimer <= 0 && enemy.fireTimer <= 0 && distance < prefRange + rangeTol * 2 && distance > 1) {
-        const origin = position.clone().add(new THREE.Vector3(0, enemyRadius, 0));
-        const dir = new THREE.Vector3(dx / distance, 0, dz / distance);
-        if (isMage) {
-          spawnMageProjectile(origin, dir);
-        } else {
-          spawnEnemyProjectile(origin, dir);
+      if (isHealer) {
+        // Heal the nearest damaged ally.
+        enemy.healTimer -= dt;
+        if (!fleeing && !cowardHiding && enemy.scatterTimer <= 0 && enemy.healTimer <= 0) {
+          const patient = nearestDamagedAlly(enemy, healerHealRange);
+          if (patient) {
+            patient.hp = Math.min(patient.maxHp, patient.hp + healerHealAmount);
+            if (patient.healthBar) patient.healthBar.setHp(patient.hp, patient.maxHp);
+            enemy.healTimer = 1 / healerHealRate + Math.random() * 0.2;
+            const ddx = patient.mesh.position.x - position.x;
+            const ddz = patient.mesh.position.z - position.z;
+            enemy.mesh.rotation.y = Math.atan2(ddx, ddz);
+          }
         }
-        enemy.fireTimer = 1 / fireRate + Math.random() * 0.2;
+      } else {
+        // Fire when roughly in range and not fleeing/scattering/hiding.
+        enemy.fireTimer -= dt;
+        if (!fleeing && !cowardHiding && enemy.scatterTimer <= 0 && enemy.fireTimer <= 0 && distance < prefRange + rangeTol * 2 && distance > 1) {
+          const origin = position.clone().add(new THREE.Vector3(0, enemyRadius, 0));
+          const dir = new THREE.Vector3(dx / distance, 0, dz / distance);
+          if (isMage) {
+            spawnMageProjectile(origin, dir);
+          } else {
+            spawnEnemyProjectile(origin, dir);
+          }
+          enemy.fireTimer = 1 / fireRate + Math.random() * 0.2;
+        }
       }
     } else {
       // Brawler movement, modified by personality.

@@ -22,7 +22,7 @@ export const contactPushDistance = 1.2;   // how far the player is knocked back 
 export const contactPushEnemy = 0.6;      // how far the enemy is knocked back on contact
 
 // Enemy roles
-export const enemyRoleWeights = { brawler: 0.55, archer: 0.25, mage: 0.2 };
+export const enemyRoleWeights = { brawler: 0.45, archer: 0.20, mage: 0.15, healer: 0.20 };
 export const brawlerModelScale = 1.0;   // scale for Flow Studio fire/earth brawler models
 export const archerModelScale = 1.0;    // scale for Flow Studio water archer model
 export const mageModelScale = 1.1;      // scale for Flow Studio water mage model
@@ -47,6 +47,15 @@ export const mageProjectileDamage = 15;
 export const mageProjectileRadius = 0.7;
 export const mageProjectileRange = 30;
 export const mageBlastRadius = 4;         // splash radius on hit (visual + damage)
+
+// Healer
+export const healerSpeed = 2.2;
+export const healerPreferredRange = 24;   // stays far back
+export const healerRangeTolerance = 5;
+export const healerHealRange = 18;
+export const healerHealAmount = 15;
+export const healerHealRate = 0.5;        // heals per second
+export const healerModelScale = 1.0;
 
 // Enemy personalities
 export const personalityWeights = { grunt: 0.5, leader: 0.15, hero: 0.15, coward: 0.2 };
