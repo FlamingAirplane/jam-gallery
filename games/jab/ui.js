@@ -81,6 +81,23 @@ export function createUI() {
   Object.assign(music.style, { marginTop: '4px', fontSize: '12px', color: GREY.light });
   panel.append(music);
 
+  const level = document.createElement('div');
+  Object.assign(level.style, { marginTop: '4px', fontSize: '13px', color: GREY.pale });
+  panel.append(level);
+
+  const xpLabel = document.createElement('div');
+  Object.assign(xpLabel.style, { marginTop: '2px', fontSize: '12px', color: GREY.light });
+  xpLabel.textContent = 'XP';
+  panel.append(xpLabel);
+  const xpOuter = document.createElement('div');
+  Object.assign(xpOuter.style, {
+    marginTop: '2px', height: '6px', background: GREY.dark, border: `1px solid ${GREY.mid}`,
+  });
+  const xpBar = document.createElement('div');
+  Object.assign(xpBar.style, { height: '100%', width: '0%', background: '#d4a65a' });
+  xpOuter.appendChild(xpBar);
+  panel.append(xpOuter);
+
   // Centre banner for floor start / complete announcements.
   const banner = document.createElement('div');
   Object.assign(banner.style, {
@@ -100,11 +117,36 @@ export function createUI() {
   banner.appendChild(bannerBox);
   root.append(banner);
 
-  els = { score, floor, wave, hp, bar, over, overStats, music, banner, bannerTitle, bannerSub };
+  // Level-up choice panel (hidden until needed).
+  const levelup = document.createElement('div');
+  Object.assign(levelup.style, {
+    position: 'absolute', inset: '0', display: 'none', placeItems: 'center',
+    background: 'rgba(0,0,0,0.75)',
+  });
+  const levelupBox = document.createElement('div');
+  Object.assign(levelupBox.style, {
+    padding: '28px 36px', textAlign: 'center', background: 'rgba(0,0,0,0.85)',
+    border: `2px solid ${GREY.light}`, borderRadius: '10px', maxWidth: '420px',
+  });
+  const levelupTitle = document.createElement('div');
+  levelupTitle.textContent = 'Level Up!';
+  Object.assign(levelupTitle.style, { fontSize: '24px', marginBottom: '16px' });
+  const levelupHint = document.createElement('div');
+  levelupHint.textContent = 'Choose one upgrade';
+  Object.assign(levelupHint.style, { color: GREY.pale, fontSize: '13px', marginBottom: '16px' });
+  const levelupButtons = document.createElement('div');
+  Object.assign(levelupButtons.style, { display: 'flex', flexDirection: 'column', gap: '10px' });
+  levelupBox.append(levelupTitle, levelupHint, levelupButtons);
+  levelup.appendChild(levelupBox);
+  root.append(levelup);
+
+  els = { score, floor, wave, hp, bar, over, overStats, music, level, xpBar, banner, bannerTitle, bannerSub, levelup, levelupButtons };
   setScore(0);
   setFloor(1);
   setWave(1, 1);
   setHealth(1, 1);
+  setLevel(1);
+  setXP(0, 100);
   return {
     setRestartHandler(fn) { onRestart = fn; },
     setMusicMuted(muted) {
@@ -151,6 +193,39 @@ export function setHealth(hp, maxHp) {
   const shown = Math.max(0, Math.ceil(hp));
   els.hp.textContent = `HP: ${shown} / ${maxHp}`;
   els.bar.style.width = `${Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0)) * 100}%`;
+}
+
+export function setLevel(n) {
+  if (!els) return;
+  els.level.textContent = `Level: ${n}`;
+}
+
+export function setXP(xp, xpToNext) {
+  if (!els) return;
+  const ratio = Math.max(0, Math.min(1, xpToNext > 0 ? xp / xpToNext : 0));
+  els.xpBar.style.width = `${ratio * 100}%`;
+}
+
+export function showLevelUp(choices, onChoose) {
+  if (!els) return;
+  els.levelupButtons.innerHTML = '';
+  for (const choice of choices) {
+    const btn = document.createElement('button');
+    btn.textContent = choice.label;
+    Object.assign(btn.style, {
+      pointerEvents: 'auto', cursor: 'pointer', font: 'inherit', padding: '10px 18px',
+      color: GREY.white, background: GREY.dark, border: `1px solid ${GREY.light}`, borderRadius: '6px',
+    });
+    btn.addEventListener('click', () => onChoose(choice));
+    btn.addEventListener('mousedown', (event) => event.stopPropagation());
+    els.levelupButtons.appendChild(btn);
+  }
+  els.levelup.style.display = 'grid';
+}
+
+export function hideLevelUp() {
+  if (!els) return;
+  els.levelup.style.display = 'none';
 }
 
 export function showGameOver(score, floor) {

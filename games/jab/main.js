@@ -12,8 +12,9 @@ import {
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
   burnDuration, earthSlowChance, earthSlowDuration,
+  xpBase, xpGrowth, xpValues, levelUpChoices, upgradeOptions,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=9';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=10';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
@@ -26,10 +27,11 @@ import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns,
 } from './abilities.js?v=2';
 import {
-  createUI, setScore, setFloor, setWave, setHealth, showGameOver, hideGameOver,
+  createUI, setScore, setFloor, setWave, setHealth, setLevel, setXP, showGameOver, hideGameOver,
+  showLevelUp, hideLevelUp,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
   createSpawnIndicator, positionSpawnIndicator, showBanner,
-} from './ui.js?v=3';
+} from './ui.js?v=4';
 
 // --- Overlay -----------------------------------------------------------------
 const ui = createUI();
@@ -209,12 +211,15 @@ if (showFps) {
 
 // --- Game state --------------------------------------------------------------
 const player = createPlayer(scene);
-const maxHp = () => player.maxHp ?? playerHP;
+const maxHp = () => playerHP * player.upgrades.maxHp;
 
-let state = 'playing';       // 'playing' | 'gameover'
+let state = 'playing';       // 'playing' | 'gameover' | 'levelup'
 let score = 0;               // enemies killed
 let floor = 1;               // the descent itself arrives in M2
 let waveInFloor = 1;         // current wave out of wavesPerFloor
+let playerLevel = 1;
+let playerXP = 0;
+let xpToNext = xpBase;
 let contactTimer = 0;
 let waveTimer = 0;
 let shownHp = null;
@@ -352,6 +357,7 @@ function restart() {
   clearFX();
   clearAbilities(scene);
   screenShake = 0;
+  player.upgrades = { damage: 1, speed: 1, maxHp: 1, fireRate: 1 };
   player.hp = maxHp();
   player.dead = false;
   player.group.position.set(0, player.group.position.y, 0);
@@ -359,6 +365,9 @@ function restart() {
   score = 0;
   floor = 1;
   waveInFloor = 1;
+  playerLevel = 1;
+  playerXP = 0;
+  xpToNext = xpBase;
   contactTimer = 0;
   waveTimer = spawnInterval;
   shownHp = player.hp;
@@ -439,9 +448,54 @@ function killEnemy(enemy, deathPos) {
   screenShake += screenShakeAmount;
   score += 1;
   playHit(player.element);
+  addXP(xpForEnemy(enemy));
   if (Math.random() < enemyElementDropChance) {
     spawnElementFieldAt(scene, deathPos);
   }
+}
+
+function xpForEnemy(enemy) {
+  let xp = xpValues[enemy.role] ?? xpValues.brawler;
+  if (enemy.personality === 'hero') xp *= xpValues.heroMul ?? 1;
+  return Math.floor(xp);
+}
+
+function addXP(amount) {
+  if (state !== 'playing' && state !== 'levelup') return;
+  playerXP += amount;
+  setXP(playerXP, xpToNext);
+  if (playerXP >= xpToNext) {
+    playerXP -= xpToNext;
+    xpToNext = Math.floor(xpToNext * xpGrowth);
+    levelUp();
+  }
+}
+
+function levelUp() {
+  playerLevel += 1;
+  setLevel(playerLevel);
+  setXP(playerXP, xpToNext);
+  state = 'levelup';
+  setMouseDown(false);
+
+  // Pick a few random upgrades.
+  const choices = [];
+  const pool = upgradeOptions.slice();
+  while (choices.length < levelUpChoices && pool.length > 0) {
+    const i = Math.floor(Math.random() * pool.length);
+    choices.push(pool.splice(i, 1)[0]);
+  }
+
+  showLevelUp(choices, (choice) => {
+    player.upgrades[choice.key] *= choice.mul;
+    if (choice.key === 'maxHp') {
+      const ratio = player.hp / maxHp();
+      player.hp = maxHp() * Math.max(0.1, ratio);
+    }
+    state = 'playing';
+    hideLevelUp();
+    setHealth(player.hp, maxHp());
+  });
 }
 
 function damageEnemy(enemy, damage) {
@@ -691,3 +745,5 @@ setScore(score);
 setFloor(floor);
 setWave(waveInFloor, wavesPerFloor);
 setHealth(player.hp, maxHp());
+setLevel(playerLevel);
+setXP(playerXP, xpToNext);

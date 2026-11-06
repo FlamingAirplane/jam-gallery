@@ -174,3 +174,21 @@ export const enemyHealthBarHeight = 5;   // pixels
 export const enemyHealthBarYOffset = 28; // pixels above enemy centre on screen
 export const enemyHealthBarColor = '#e74c3c';
 export const enemyHealthBarBg = '#333333';
+
+// XP / level-up meta progression
+export const xpBase = 100;               // XP to reach level 2
+export const xpGrowth = 1.25;            // multiply xpToNext each level
+export const xpValues = {                // XP awarded on kill
+  brawler: 10,
+  archer: 14,
+  mage: 18,
+  healer: 20,
+  heroMul: 1.5,
+};
+export const levelUpChoices = 3;         // how many upgrade cards to offer
+export const upgradeOptions = [
+  { key: 'damage', label: '+10% Shot Damage', mul: 1.10 },
+  { key: 'speed', label: '+10% Move Speed', mul: 1.10 },
+  { key: 'maxHp', label: '+10% Max HP', mul: 1.10 },
+  { key: 'fireRate', label: '+10% Fire Rate', mul: 1.10 },
+];
