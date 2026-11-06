@@ -137,8 +137,6 @@ function createLevel(scene, floorNumber = 1) {
   columnMeshes.push(...level.columns);
 }
 
-createLevel(scene, floor);
-
 // --- Input -------------------------------------------------------------------
 // Keys are held under several spellings ('Space'/'space'/' ', 'KeyW'/'keyw'/'w')
 // so player.js can look up whichever it checks for.
