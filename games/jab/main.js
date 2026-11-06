@@ -413,6 +413,7 @@ function clearColumns() {
 function createColumnMesh() {
   const shaftHeight = 4;
   const shaftGeo = new THREE.CylinderGeometry(columnRadius * 0.8, columnRadius * 0.85, shaftHeight, 16);
+  shaftGeo.translate(0, shaftHeight / 2, 0);
   const baseGeo = new THREE.CylinderGeometry(columnRadius * 1.1, columnRadius * 1.2, 0.3, 16);
   baseGeo.translate(0, 0.15, 0);
   const capGeo = new THREE.CylinderGeometry(columnRadius * 1.1, columnRadius * 0.9, 0.3, 16);
@@ -596,6 +597,40 @@ function absorbFields() {
 }
 
 // --- Collision (ours, not the other builder's) --------------------------------
+function projectileHitsWall(position, radius) {
+  for (const wall of walls) {
+    const closestX = Math.max(wall.x - wall.halfW, Math.min(position.x, wall.x + wall.halfW));
+    const closestZ = Math.max(wall.z - wall.halfD, Math.min(position.z, wall.z + wall.halfD));
+    const dx = position.x - closestX;
+    const dz = position.z - closestZ;
+    if (dx * dx + dz * dz < radius * radius) return true;
+  }
+  for (const mesh of columnMeshes) {
+    const dx = position.x - mesh.position.x;
+    const dz = position.z - mesh.position.z;
+    if (dx * dx + dz * dz < (radius + columnRadius) * (radius + columnRadius)) return true;
+  }
+  return false;
+}
+
+function blockProjectiles() {
+  for (const shot of getProjectiles()) {
+    if (!alive(shot)) continue;
+    if (projectileHitsWall(shot.mesh.position, projectileRadius)) {
+      shot.alive = false;
+      if (shot.mesh) scene.remove(shot.mesh);
+      spawnHitBurst(scene, shot.mesh.position.clone(), elementColors[player.element] ?? '#f2f2f2');
+    }
+  }
+  for (const shot of getEnemyProjectiles()) {
+    if (!alive(shot)) continue;
+    if (projectileHitsWall(shot.mesh.position, archerProjectileRadius)) {
+      shot.alive = false;
+      if (shot.mesh.parent) shot.mesh.parent.remove(shot.mesh);
+    }
+  }
+}
+
 function hitEnemies() {
   const enemies = getEnemies();
   for (const shot of getProjectiles()) {
@@ -717,6 +752,7 @@ function update(dt) {
   updateProjectiles(dt);
   updateEnemies(dt, player.group.position);
   updateEnemyProjectiles(dt);
+  blockProjectiles();
   separateEnemies();
   hitPlayer(dt);
 
