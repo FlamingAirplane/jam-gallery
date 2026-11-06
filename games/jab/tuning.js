@@ -33,6 +33,7 @@ export const archerProjectileRadius = 0.3;
 export const archerProjectileRange = 35;
 export const brawlerModelScale = 1.0;   // scale for Flow Studio fire/earth brawler models
 export const archerModelScale = 1.0;    // scale for Flow Studio water archer model
+export const arrowTurnSpeed = 4.0;      // radians per second when rotating with arrow keys
 
 // Waves
 export const spawnInterval = 2.5;    // seconds of quiet before the next wave

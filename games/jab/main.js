@@ -14,7 +14,7 @@ import {
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=7';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=8';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
@@ -268,7 +268,7 @@ function setMouseDown(down) {
 }
 
 addEventListener('keydown', (event) => {
-  if (event.code === 'Space') event.preventDefault();
+  if (event.code === 'Space' || event.code.startsWith('Arrow')) event.preventDefault();
   for (const token of spellings(event)) keys.add(token);
   if (event.code === 'KeyM') {
     const muted = toggleMusic();

@@ -20,6 +20,7 @@ import {
   elementFireRateMul,
   elementRotationSpeedMul,
   trailSpawnInterval,
+  arrowTurnSpeed,
 } from './tuning.js';
 import { spawnMuzzleFlash, spawnProjectileTrailDot, clearFX } from './fx.js?v=2';
 import { playShoot } from './audio.js?v=2';
@@ -204,16 +205,24 @@ export function updatePlayer(player, dt, ctx) {
     position.z = clamp(position.z + moveStep.z, -arenaSize, arenaSize);
   }
 
-  // Aim: shoot the mouse ray at the floor plane and turn toward that spot.
-  raycaster.setFromCamera(ctx.mouseNDC, ctx.camera);
-  if (raycaster.ray.intersectPlane(groundPlane, hitPoint)) {
-    const dx = hitPoint.x - position.x;
-    const dz = hitPoint.z - position.z;
-    if (dx !== 0 || dz !== 0) {
-      player.facing.set(dx, 0, dz).normalize();
-      const targetAngle = Math.atan2(player.facing.x, player.facing.z);
-      const turnSpeed = 12 * elementRotationSpeedMul[player.element] * dt;
-      player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, turnSpeed);
+  // Aim: arrow keys rotate manually; otherwise turn toward the mouse cursor.
+  let arrowTurn = 0;
+  if (held(keys, 'ArrowLeft', 'ArrowLeft')) arrowTurn += 1;
+  if (held(keys, 'ArrowRight', 'ArrowRight')) arrowTurn -= 1;
+  if (arrowTurn !== 0) {
+    player.group.rotation.y += arrowTurn * arrowTurnSpeed * dt;
+    player.facing.set(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
+  } else {
+    raycaster.setFromCamera(ctx.mouseNDC, ctx.camera);
+    if (raycaster.ray.intersectPlane(groundPlane, hitPoint)) {
+      const dx = hitPoint.x - position.x;
+      const dz = hitPoint.z - position.z;
+      if (dx !== 0 || dz !== 0) {
+        player.facing.set(dx, 0, dz).normalize();
+        const targetAngle = Math.atan2(player.facing.x, player.facing.z);
+        const turnSpeed = 12 * elementRotationSpeedMul[player.element] * dt;
+        player.group.rotation.y = lerpAngle(player.group.rotation.y, targetAngle, turnSpeed);
+      }
     }
   }
 
