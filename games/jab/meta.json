@@ -3,5 +3,5 @@
   "handle": "jab",
   "description": "Aim and fire as a non-elemental golem descending a dungeon on the moon, absorbing one element at a time from glowing fields.",
   "assets": [],
-  "ai_assets": ["assets/golem.glb"]
+  "ai_assets": ["assets/golem.glb", "assets/make_golem.py"]
 }
