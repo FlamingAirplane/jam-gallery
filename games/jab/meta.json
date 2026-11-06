@@ -1,7 +1,7 @@
 {
-  "title": "Golem in the Moon Dungeon",
+  "title": "LunaGolem",
   "handle": "jab",
-  "description": "Aim and fire as a non-elemental golem descending a dungeon on the moon, absorbing one element at a time from glowing fields.",
+  "description": "Aim and fire as LunaGolem, descending a dungeon on the moon and absorbing one element at a time from glowing fields.",
   "assets": [
     {
       "file": "assets/golem.glb",
