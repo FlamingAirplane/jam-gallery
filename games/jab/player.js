@@ -10,6 +10,7 @@ import {
   projectileRange,
   projectileRadius,
   arenaSize,
+  elementColors,
   fireProjectileSpeed,
   waterProjectileSpeed,
   earthProjectileSpeed,
