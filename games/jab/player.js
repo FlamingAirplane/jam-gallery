@@ -168,6 +168,9 @@ export function setElement(player, type) {
       // Keep textured materials looking like their baked texture.
       child.material.emissive.copy(glow);
       child.material.emissiveIntensity = 0.55;
+      // Remove specular sheen.
+      child.material.roughness = 1;
+      child.material.metalness = 0;
     }
   });
 }
