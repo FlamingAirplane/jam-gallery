@@ -192,3 +192,7 @@ export const upgradeOptions = [
   { key: 'maxHp', label: '+10% Max HP', mul: 1.10 },
   { key: 'fireRate', label: '+10% Fire Rate', mul: 1.10 },
 ];
+
+// Item drops
+export const itemDropChance = 0.05;      // chance an enemy drops an item on death
+export const itemDuration = 10;          // seconds temporary buffs last

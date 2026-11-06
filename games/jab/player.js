@@ -156,6 +156,7 @@ export function createPlayer(scene) {
     element: null,
     facing: new THREE.Vector3(0, 0, 1), // where the next shot goes
     upgrades: { damage: 1, speed: 1, maxHp: 1, fireRate: 1 },
+    buffs: { damage: 1, speed: 1, fireRate: 1 },
   };
   setElement(player, 'fire');
   activePlayer = player;
@@ -215,7 +216,7 @@ export function updatePlayer(player, dt, ctx) {
   }
 
   if (moveStep.lengthSq() > 0) {
-    moveStep.normalize().multiplyScalar(moveSpeed * elementMoveSpeedMul[player.element] * speedMul * player.upgrades.speed * dt);
+    moveStep.normalize().multiplyScalar(moveSpeed * elementMoveSpeedMul[player.element] * speedMul * player.upgrades.speed * player.buffs.speed * dt);
     position.x = clamp(position.x + moveStep.x, -arenaSize, arenaSize);
     position.z = clamp(position.z + moveStep.z, -arenaSize, arenaSize);
   }
@@ -245,7 +246,7 @@ export function updatePlayer(player, dt, ctx) {
   fireTimer = Math.max(0, fireTimer - dt);
   if (firing(ctx) && fireTimer === 0) {
     spawnShot(player);
-    fireTimer = 1 / (fireRate * elementFireRateMul[player.element] * player.upgrades.fireRate);
+    fireTimer = 1 / (fireRate * elementFireRateMul[player.element] * player.upgrades.fireRate * player.buffs.fireRate);
   }
 
   player.dead = player.hp <= 0;
@@ -287,7 +288,7 @@ function spawnShot(player) {
 
   let mesh;
   let speed = projectileSpeed;
-  let damage = projectileDamage * player.upgrades.damage;
+  let damage = projectileDamage * player.upgrades.damage * player.buffs.damage;
   let pierce;
 
   if (element === 'water') {

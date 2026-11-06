@@ -13,6 +13,7 @@ import {
   archerProjectileRadius, archerProjectileDamage,
   burnDuration, earthSlowChance, earthSlowDuration,
   xpBase, xpGrowth, xpValues, levelUpChoices, upgradeOptions,
+  itemDropChance, itemDuration,
 } from './tuning.js';
 import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=10';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
@@ -21,6 +22,7 @@ import {
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=6';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
+import { spawnItemAt, updateItems, clearItems, itemTypeFor } from './items.js?v=1';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
 import { buildMap } from './level.js?v=4';
 import {
@@ -221,6 +223,7 @@ let playerLevel = 1;
 let playerXP = 0;
 let xpToNext = xpBase;
 let contactTimer = 0;
+const itemBuffs = { damage: { timer: 0, mul: 1 }, speed: { timer: 0, mul: 1 }, fireRate: { timer: 0, mul: 1 } };
 let waveTimer = 0;
 let shownHp = null;
 let screenShake = 0;
@@ -356,8 +359,11 @@ function restart() {
   clearEnemyProjectiles();
   clearFX();
   clearAbilities(scene);
+  clearItems(scene);
   screenShake = 0;
   player.upgrades = { damage: 1, speed: 1, maxHp: 1, fireRate: 1 };
+  player.buffs = { damage: 1, speed: 1, fireRate: 1 };
+  for (const key of Object.keys(itemBuffs)) { itemBuffs[key].timer = 0; itemBuffs[key].mul = 1; }
   player.hp = maxHp();
   player.dead = false;
   player.group.position.set(0, player.group.position.y, 0);
@@ -452,12 +458,25 @@ function killEnemy(enemy, deathPos) {
   if (Math.random() < enemyElementDropChance) {
     spawnElementFieldAt(scene, deathPos);
   }
+  if (Math.random() < itemDropChance) {
+    spawnItemAt(scene, deathPos);
+  }
 }
 
 function xpForEnemy(enemy) {
   let xp = xpValues[enemy.role] ?? xpValues.brawler;
   if (enemy.personality === 'hero') xp *= xpValues.heroMul ?? 1;
   return Math.floor(xp);
+}
+
+function applyItem(type) {
+  if (type.key === 'heal') {
+    player.hp = Math.min(maxHp(), player.hp + maxHp() * 0.3);
+  } else {
+    itemBuffs[type.key].timer = itemDuration;
+    itemBuffs[type.key].mul = type.mul;
+    player.buffs[type.key] = type.mul;
+  }
 }
 
 function addXP(amount) {
@@ -649,6 +668,18 @@ function update(dt) {
   touchDamage(dt);
   updateElementFields(dt);
 
+  // Item pickups and buff timers.
+  const pickups = updateItems(dt, player.group.position);
+  for (const itemType of pickups) applyItem(itemType);
+  for (const key of Object.keys(itemBuffs)) {
+    if (itemBuffs[key].timer > 0) {
+      itemBuffs[key].timer -= dt;
+      player.buffs[key] = itemBuffs[key].mul;
+    } else {
+      player.buffs[key] = 1;
+    }
+  }
+
   // Alternate-fire abilities.
   const abilityEvents = updateAbilities(dt, getEnemies(), scene);
   for (const ev of abilityEvents) {
@@ -691,6 +722,7 @@ function update(dt) {
         showBanner('Floor Complete', `Descending to floor ${floor}`, 1500);
         createLevel(scene, floor);
         clearAbilities(scene);
+        clearItems(scene);
         spawnWaveCustom(scene, waveSize + (floor - 1) * waveGrowth);
         attachHealthBars();
         clearElementFields();
