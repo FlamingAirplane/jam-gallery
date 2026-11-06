@@ -17,15 +17,18 @@ import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
-} from './enemies.js?v=3';
+} from './enemies.js?v=4';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
-import { buildMap } from './level.js?v=3';
+import { buildMap } from './level.js?v=4';
+import {
+  triggerAbility, updateAbilities, clearAbilities, getCooldowns,
+} from './abilities.js?v=1';
 import {
   createUI, setScore, setFloor, setWave, setHealth, showGameOver, hideGameOver,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
-  createSpawnIndicator, positionSpawnIndicator,
-} from './ui.js?v=2';
+  createSpawnIndicator, positionSpawnIndicator, showBanner,
+} from './ui.js?v=3';
 
 // --- Overlay -----------------------------------------------------------------
 const ui = createUI();
@@ -127,14 +130,14 @@ function clearLevel() {
   columnMeshes.length = 0;
 }
 
-function createLevel(scene) {
+function createLevel(scene, floorNumber = 1) {
   clearLevel();
-  const level = buildMap(scene);
+  const level = buildMap(scene, floorNumber);
   walls = level.walls;
   columnMeshes.push(...level.columns);
 }
 
-createLevel(scene);
+createLevel(scene, floor);
 
 // --- Input -------------------------------------------------------------------
 // Keys are held under several spellings ('Space'/'space'/' ', 'KeyW'/'keyw'/'w')
@@ -163,6 +166,17 @@ function setMouseDown(down) {
   }
 }
 
+function tryTriggerAbility() {
+  if (state !== 'playing' || !player) return;
+  const result = triggerAbility(player, scene);
+  if (result) {
+    resumeAudio();
+    tryStartMusic();
+  }
+}
+
+addEventListener('contextmenu', (event) => event.preventDefault());
+
 addEventListener('keydown', (event) => {
   if (event.code === 'Space' || event.code.startsWith('Arrow')) event.preventDefault();
   for (const token of spellings(event)) keys.add(token);
@@ -170,6 +184,7 @@ addEventListener('keydown', (event) => {
     const muted = toggleMusic();
     ui.setMusicMuted(muted);
   }
+  if (event.code === 'KeyE') tryTriggerAbility();
   if (state === 'gameover' && event.key.toLowerCase() === 'r') restart();
   tryStartMusic();
 });
@@ -180,6 +195,8 @@ addEventListener('mousedown', (event) => {
     setMouseDown(true);
     resumeAudio();
     tryStartMusic();
+  } else if (event.button === 2) {
+    tryTriggerAbility();
   }
 });
 addEventListener('mouseup', (event) => { if (event.button === 0) setMouseDown(false); });
@@ -250,7 +267,7 @@ function attachHealthBars() {
   for (const enemy of getEnemies()) {
     if (!enemy.healthBar) {
       enemy.healthBar = createEnemyHealthBar();
-      enemy.healthBar.setHp(enemy.hp, enemyHP);
+      enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
     }
   }
 }
@@ -371,6 +388,7 @@ function restart() {
   clearLevel();
   clearEnemyProjectiles();
   clearFX();
+  clearAbilities(scene);
   screenShake = 0;
   player.hp = maxHp();
   player.dead = false;
@@ -383,7 +401,7 @@ function restart() {
   waveTimer = spawnInterval;
   shownHp = player.hp;
   setMouseDown(false);
-  createLevel(scene);
+  createLevel(scene, floor);
   spawnWaveCustom(scene, waveSize);
   attachHealthBars();
   spawnElementFields(scene, elementFieldCount);
@@ -444,10 +462,32 @@ function blockProjectiles() {
   }
   for (const shot of getEnemyProjectiles()) {
     if (!alive(shot)) continue;
-    if (projectileHitsWall(shot.mesh.position, archerProjectileRadius)) {
+    if (projectileHitsWall(shot.mesh.position, shot.radius ?? archerProjectileRadius)) {
       shot.alive = false;
       if (shot.mesh.parent) shot.mesh.parent.remove(shot.mesh);
     }
+  }
+}
+
+function killEnemy(enemy, deathPos) {
+  enemy.alive = false;
+  if (enemy.mesh) scene.remove(enemy.mesh);
+  if (enemy.healthBar) { enemy.healthBar.remove(); enemy.healthBar = null; }
+  spawnHitBurst(scene, deathPos, elementColors[player.element]);
+  screenShake += screenShakeAmount;
+  score += 1;
+  playHit(player.element);
+  if (Math.random() < enemyElementDropChance) {
+    spawnElementFieldAt(scene, deathPos);
+  }
+}
+
+function damageEnemy(enemy, damage) {
+  if (!alive(enemy)) return;
+  enemy.hp -= damage;
+  if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
+  if (enemy.hp <= 0) {
+    killEnemy(enemy, enemy.mesh.position.clone());
   }
 }
 
@@ -460,7 +500,7 @@ function hitEnemies() {
       const reach = projectileRadius + (enemy.radius ?? enemyRadius);
       if (distanceXZ(shot.mesh.position, enemy.mesh.position) < reach) {
         enemy.hp -= shot.damage ?? projectileDamage;
-        if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemyHP);
+        if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
         if (shot.pierce !== undefined) {
           shot.pierce -= 1;
           if (shot.pierce <= 0) {
@@ -472,17 +512,7 @@ function hitEnemies() {
           if (shot.mesh) scene.remove(shot.mesh);
         }
         if (enemy.hp <= 0) {
-          const deathPos = enemy.mesh.position.clone();
-          enemy.alive = false;
-          if (enemy.mesh) scene.remove(enemy.mesh);
-          if (enemy.healthBar) { enemy.healthBar.remove(); enemy.healthBar = null; }
-          spawnHitBurst(scene, deathPos, elementColors[player.element]);
-          screenShake += screenShakeAmount;
-          score += 1;
-          playHit(player.element);
-          if (Math.random() < enemyElementDropChance) {
-            spawnElementFieldAt(scene, deathPos);
-          }
+          killEnemy(enemy, enemy.mesh.position.clone());
         }
         break;   // this shot hit one enemy this frame
       }
@@ -494,7 +524,8 @@ function hitPlayer() {
   const playerPos = player.group.position;
   for (const shot of getEnemyProjectiles()) {
     if (!alive(shot)) continue;
-    if (distanceXZ(shot.mesh.position, playerPos) < archerProjectileRadius + playerRadius) {
+    const radius = shot.radius ?? archerProjectileRadius;
+    if (distanceXZ(shot.mesh.position, playerPos) < radius + playerRadius) {
       player.hp -= shot.damage ?? archerProjectileDamage;
       shot.alive = false;
       if (shot.mesh.parent) shot.mesh.parent.remove(shot.mesh);
@@ -591,6 +622,22 @@ function update(dt) {
   touchDamage(dt);
   updateElementFields(dt);
 
+  // Alternate-fire abilities.
+  const abilityEvents = updateAbilities(dt, getEnemies(), scene);
+  for (const ev of abilityEvents) {
+    if (ev.type === 'damage') {
+      damageEnemy(ev.enemy, ev.damage);
+    } else if (ev.type === 'knockback') {
+      if (alive(ev.enemy)) {
+        ev.enemy.mesh.position.addScaledVector(ev.dir, ev.amount * dt);
+      }
+    } else if (ev.type === 'burst') {
+      spawnHitBurst(scene, ev.position, ev.color);
+    } else if (ev.type === 'shake') {
+      screenShake += ev.amount;
+    }
+  }
+
   if (player.hp <= 0 && !player.dead) {
     player.dead = true;
     state = 'gameover';
@@ -611,10 +658,15 @@ function update(dt) {
       } else {
         floor += 1;
         waveInFloor = 1;
+        screenShake += screenShakeAmount * 2;
+        showBanner('Floor Complete', `Descending to floor ${floor}`, 1500);
+        createLevel(scene, floor);
+        clearAbilities(scene);
         spawnWaveCustom(scene, waveSize + (floor - 1) * waveGrowth);
         attachHealthBars();
         clearElementFields();
         spawnElementFields(scene, elementFieldCount + Math.floor(floor / 2));
+        setTimeout(() => showBanner(`Floor ${floor}`, 'Survive the waves', 2500), 1600);
       }
       waveTimer = spawnInterval;
       setWave(waveInFloor, wavesPerFloor);
@@ -654,7 +706,8 @@ renderer.setAnimationLoop(() => {
   }
 });
 
-createLevel(scene);
+createLevel(scene, floor);
+showBanner(`Floor ${floor}`, 'Survive the waves', 3000);
 spawnWaveCustom(scene, waveSize);
 attachHealthBars();
 waveTimer = spawnInterval;

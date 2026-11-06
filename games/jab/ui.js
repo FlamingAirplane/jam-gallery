@@ -81,7 +81,26 @@ export function createUI() {
   Object.assign(music.style, { marginTop: '4px', fontSize: '12px', color: GREY.light });
   panel.append(music);
 
-  els = { score, floor, wave, hp, bar, over, overStats, music };
+  // Centre banner for floor start / complete announcements.
+  const banner = document.createElement('div');
+  Object.assign(banner.style, {
+    position: 'absolute', inset: '0', display: 'none', placeItems: 'center',
+    opacity: '0', transition: 'opacity 0.4s ease',
+  });
+  const bannerBox = document.createElement('div');
+  Object.assign(bannerBox.style, {
+    padding: '18px 40px', textAlign: 'center', background: 'rgba(0,0,0,0.7)',
+    border: `2px solid ${GREY.light}`, borderRadius: '10px',
+  });
+  const bannerTitle = document.createElement('div');
+  Object.assign(bannerTitle.style, { fontSize: '32px', fontWeight: 'bold', letterSpacing: '1px' });
+  const bannerSub = document.createElement('div');
+  Object.assign(bannerSub.style, { marginTop: '6px', fontSize: '15px', color: GREY.pale });
+  bannerBox.append(bannerTitle, bannerSub);
+  banner.appendChild(bannerBox);
+  root.append(banner);
+
+  els = { score, floor, wave, hp, bar, over, overStats, music, banner, bannerTitle, bannerSub };
   setScore(0);
   setFloor(1);
   setWave(1, 1);
@@ -93,6 +112,21 @@ export function createUI() {
       els.music.textContent = muted ? 'Music: MUTED (M to unmute)' : 'Music: ON (M to mute)';
     },
   };
+}
+
+export function showBanner(title, sub = '', duration = 2000) {
+  if (!els) return;
+  els.bannerTitle.textContent = title;
+  els.bannerSub.textContent = sub;
+  els.banner.style.display = 'grid';
+  // Force reflow so the transition plays.
+  void els.banner.offsetWidth;
+  els.banner.style.opacity = '1';
+  if (els.bannerTimer) clearTimeout(els.bannerTimer);
+  els.bannerTimer = setTimeout(() => {
+    els.banner.style.opacity = '0';
+    setTimeout(() => { els.banner.style.display = 'none'; }, 400);
+  }, duration);
 }
 
 export function setScore(n) {

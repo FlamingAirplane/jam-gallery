@@ -179,7 +179,7 @@ function addTorch(scene, x, z, y = 3.2) {
   scene.add(fixture);
 }
 
-function createCentralDisc(scene) {
+function createCentralDisc(scene, radius = 10) {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -207,7 +207,7 @@ function createCentralDisc(scene) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
-    new THREE.CircleGeometry(10, 48),
+    new THREE.CircleGeometry(radius, 48),
     new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, transparent: true, opacity: 0.9 })
   );
   mesh.rotation.x = -Math.PI / 2;
@@ -215,7 +215,17 @@ function createCentralDisc(scene) {
   scene.add(mesh);
 }
 
-export function buildMap(scene) {
+function getLayout(floor) {
+  // Three preset dungeon arrangements that cycle every floor.
+  const presets = [
+    { roomCenter: 28, roomSize: 18, corridorW: 8, centralR: 10, name: 'cross' },
+    { roomCenter: 26, roomSize: 22, corridorW: 12, centralR: 12, name: 'wide halls' },
+    { roomCenter: 30, roomSize: 16, corridorW: 5, centralR: 8, name: 'tight keep' },
+  ];
+  return presets[(floor - 1) % presets.length];
+}
+
+export function buildMap(scene, floor = 1) {
   const walls = [];
   const wallMeshes = [];
   const columns = [];
@@ -223,10 +233,11 @@ export function buildMap(scene) {
   const half = arenaSize;
   const wallH = wallHeight;
   const thickness = 2.2;
-  const roomCenter = 28;
-  const roomSize = 18; // outer half-size
-  const corridorW = 8;
-  const centralR = 10;
+  const layout = getLayout(floor);
+  const roomCenter = layout.roomCenter;
+  const roomSize = layout.roomSize;
+  const corridorW = layout.corridorW;
+  const centralR = layout.centralR;
 
   // --- Perimeter walls with crenellations ------------------------------------
   const perimeterH = wallH;
@@ -302,7 +313,7 @@ export function buildMap(scene) {
   }
 
   // --- Central disc/fountain --------------------------------------------------
-  createCentralDisc(scene);
+  createCentralDisc(scene, centralR);
   addTorch(scene, 0, 0, 1.5);
 
   // --- Extra pillars around the central chamber -------------------------------

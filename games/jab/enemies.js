@@ -2,20 +2,33 @@
 import * as THREE from 'three';
 import {
   enemySpeed, enemyHP, enemyRadius, arenaSize,
-  enemyRoleWeights, archerSpeed, archerPreferredRange, archerRangeTolerance,
+  enemyRoleWeights, personalityWeights,
+  archerSpeed, archerPreferredRange, archerRangeTolerance,
   archerFireRate, archerProjectileSpeed, archerProjectileDamage,
   archerProjectileRadius, archerProjectileRange,
-  brawlerModelScale, archerModelScale,
+  mageSpeed, magePreferredRange, mageRangeTolerance,
+  mageFireRate, mageProjectileSpeed, mageProjectileDamage,
+  mageProjectileRadius, mageProjectileRange,
+  brawlerModelScale, archerModelScale, mageModelScale,
+  leaderAuraRadius, leaderSpeedMul, heroHpMul, heroSpeedMul, cowardFleeHpRatio,
 } from './tuning.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const BRAWLER_COLOR = '#4a4a4a';
 const ARCHER_COLOR = '#6a5a4a';
+const MAGE_COLOR = '#8e44ad';
+const PERSONALITY_TINT = {
+  leader: '#ffd700',
+  hero: '#e74c3c',
+  coward: '#95a5a6',
+  grunt: null,
+};
 const enemies = [];
 const enemyProjectiles = [];
 let shotScene = null;
 let brawlerGeometry = null;
 let archerGeometry = null;
+let mageGeometry = null;
 let enemyProjectileGeometry = null;
 
 // Load Flow Studio enemy models; fall back to procedural geometry if any fail.
@@ -38,9 +51,25 @@ function pickArcherTemplate() {
   return enemyTemplates.water;
 }
 
+function pickMageTemplate() {
+  return enemyTemplates.water;
+}
+
 function pickRole() {
   const roll = Math.random();
-  return roll < enemyRoleWeights.brawler ? 'brawler' : 'archer';
+  if (roll < enemyRoleWeights.brawler) return 'brawler';
+  if (roll < enemyRoleWeights.brawler + enemyRoleWeights.archer) return 'archer';
+  return 'mage';
+}
+
+function pickPersonality() {
+  const roll = Math.random();
+  let sum = 0;
+  for (const [key, weight] of Object.entries(personalityWeights)) {
+    sum += weight;
+    if (roll < sum) return key;
+  }
+  return 'grunt';
 }
 
 function getBrawlerGeometry() {
@@ -61,18 +90,36 @@ function getArcherGeometry() {
   return archerGeometry;
 }
 
+function getMageGeometry() {
+  if (!mageGeometry) {
+    // A floating crystal for mages.
+    mageGeometry = new THREE.OctahedronGeometry(enemyRadius * 0.95, 0);
+    mageGeometry.translate(0, enemyRadius * 1.3, 0);
+  }
+  return mageGeometry;
+}
+
 export function spawnEnemyAt(scene, position, role = null) {
   shotScene = scene;
   const chosenRole = role ?? pickRole();
-  const isArcher = chosenRole === 'archer';
+  const personality = pickPersonality();
   let mesh;
-  if (isArcher) {
+  let scale = 1;
+  if (chosenRole === 'archer') {
     const tmpl = pickArcherTemplate();
     if (tmpl) {
       mesh = tmpl.scene.clone();
       mesh.scale.setScalar(archerModelScale);
     } else {
       mesh = new THREE.Mesh(getArcherGeometry(), new THREE.MeshStandardMaterial({ color: ARCHER_COLOR, roughness: 0.9, metalness: 0.2, flatShading: true }));
+    }
+  } else if (chosenRole === 'mage') {
+    const tmpl = pickMageTemplate();
+    if (tmpl) {
+      mesh = tmpl.scene.clone();
+      mesh.scale.setScalar(mageModelScale);
+    } else {
+      mesh = new THREE.Mesh(getMageGeometry(), new THREE.MeshStandardMaterial({ color: MAGE_COLOR, roughness: 0.6, metalness: 0.3, flatShading: true }));
     }
   } else {
     const tmpl = pickBrawlerTemplate();
@@ -83,17 +130,38 @@ export function spawnEnemyAt(scene, position, role = null) {
       mesh = new THREE.Mesh(getBrawlerGeometry(), new THREE.MeshStandardMaterial({ color: BRAWLER_COLOR, roughness: 0.9, metalness: 0.2, flatShading: true }));
     }
   }
+
+  // Personality tint and scaling.
+  const tint = PERSONALITY_TINT[personality];
+  if (tint) {
+    mesh.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material = child.material.clone();
+        child.material.emissive = new THREE.Color(tint);
+        child.material.emissiveIntensity = personality === 'hero' ? 0.35 : 0.2;
+      }
+    });
+  }
+  if (personality === 'hero') {
+    scale = 1.2;
+    mesh.scale.multiplyScalar(scale);
+  }
+
   mesh.position.copy(position);
   mesh.position.y = 0;
   mesh.rotation.y = Math.random() * Math.PI;
   scene.add(mesh);
+
+  const maxHp = enemyHP * (personality === 'hero' ? heroHpMul : 1);
   enemies.push({
     mesh,
-    hp: enemyHP,
+    hp: maxHp,
+    maxHp,
     alive: true,
-    radius: enemyRadius,
+    radius: enemyRadius * scale,
     role: chosenRole,
-    fireTimer: Math.random() * (1 / archerFireRate),
+    personality,
+    fireTimer: Math.random() * 0.8,
   });
   return enemies[enemies.length - 1];
 }
@@ -112,12 +180,17 @@ export function spawnWave(scene, count) {
   }
 }
 
-function spawnEnemyProjectile(position, direction) {
-  if (!enemyProjectileGeometry) {
-    enemyProjectileGeometry = new THREE.SphereGeometry(archerProjectileRadius, 8, 6);
-  }
-  const material = new THREE.MeshBasicMaterial({ color: '#f2a65a' });
-  const mesh = new THREE.Mesh(enemyProjectileGeometry, material);
+function spawnEnemyProjectile(position, direction, {
+  speed = archerProjectileSpeed,
+  damage = archerProjectileDamage,
+  radius = archerProjectileRadius,
+  range = archerProjectileRange,
+  color = '#f2a65a',
+} = {}) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 10, 8),
+    new THREE.MeshBasicMaterial({ color })
+  );
   mesh.position.copy(position);
   mesh.position.y = enemyRadius;
   if (shotScene) shotScene.add(mesh);
@@ -126,7 +199,20 @@ function spawnEnemyProjectile(position, direction) {
     dir: direction.clone().normalize(),
     alive: true,
     traveled: 0,
-    damage: archerProjectileDamage,
+    speed,
+    damage,
+    radius,
+    range,
+  });
+}
+
+function spawnMageProjectile(position, direction) {
+  spawnEnemyProjectile(position, direction, {
+    speed: mageProjectileSpeed,
+    damage: mageProjectileDamage,
+    radius: mageProjectileRadius,
+    range: mageProjectileRange,
+    color: '#9b59b6',
   });
 }
 
@@ -140,10 +226,10 @@ export function updateEnemyProjectiles(dt) {
   }
 
   for (const shot of enemyProjectiles) {
-    const step = archerProjectileSpeed * dt;
+    const step = (shot.speed ?? archerProjectileSpeed) * dt;
     shot.mesh.position.addScaledVector(shot.dir, step);
     shot.traveled += step;
-    if (shot.traveled >= archerProjectileRange) shot.alive = false;
+    if (shot.traveled >= (shot.range ?? archerProjectileRange)) shot.alive = false;
   }
 }
 
@@ -167,47 +253,85 @@ export function updateEnemies(dt, targetPos) {
     enemies.splice(i, 1);
   }
 
+  // Pre-compute leader positions for the aura.
+  const leaderPositions = enemies
+    .filter((e) => e.personality === 'leader' && e.alive)
+    .map((e) => e.mesh.position);
+
   for (const enemy of enemies) {
     const position = enemy.mesh.position;
     const dx = targetPos.x - position.x;
     const dz = targetPos.z - position.z;
     const distance = Math.hypot(dx, dz);
 
-    if (enemy.role === 'archer') {
-      // Archers try to keep their preferred range.
-      const tooClose = distance < archerPreferredRange - archerRangeTolerance;
-      const tooFar = distance > archerPreferredRange + archerRangeTolerance;
+    // Personality speed modifiers.
+    let speedMul = enemy.personality === 'hero' ? heroSpeedMul : 1;
+    for (const lp of leaderPositions) {
+      if (lp === position) continue;
+      if (position.distanceTo(lp) < leaderAuraRadius) {
+        speedMul *= leaderSpeedMul;
+        break;
+      }
+    }
+
+    // Cowards run away when badly hurt.
+    const fleeing = enemy.personality === 'coward' && enemy.hp / enemy.maxHp < cowardFleeHpRatio && distance < 30;
+
+    if (enemy.role === 'archer' || enemy.role === 'mage') {
+      const isMage = enemy.role === 'mage';
+      const prefRange = isMage ? magePreferredRange : archerPreferredRange;
+      const rangeTol = isMage ? mageRangeTolerance : archerRangeTolerance;
+      const moveSpeed = (isMage ? mageSpeed : archerSpeed) * speedMul;
+      const fireRate = isMage ? mageFireRate : archerFireRate;
+
       let moveDirX = 0;
       let moveDirZ = 0;
-      if (tooClose) {
-        // Back away from the golem.
+      if (fleeing) {
         moveDirX = -dx / distance;
         moveDirZ = -dz / distance;
-      } else if (tooFar) {
-        // Approach to firing range.
-        moveDirX = dx / distance;
-        moveDirZ = dz / distance;
       } else {
-        // Strafe sideways to avoid stacking.
-        moveDirX = dz / distance;
-        moveDirZ = -dx / distance;
+        const tooClose = distance < prefRange - rangeTol;
+        const tooFar = distance > prefRange + rangeTol;
+        if (tooClose) {
+          moveDirX = -dx / distance;
+          moveDirZ = -dz / distance;
+        } else if (tooFar) {
+          moveDirX = dx / distance;
+          moveDirZ = dz / distance;
+        } else {
+          // Strafe sideways to avoid stacking.
+          moveDirX = dz / distance;
+          moveDirZ = -dx / distance;
+        }
       }
-      const step = archerSpeed * dt;
-      position.x += moveDirX * step;
-      position.z += moveDirZ * step;
+      position.x += moveDirX * moveSpeed * dt;
+      position.z += moveDirZ * moveSpeed * dt;
 
-      // Fire when roughly in range.
+      // Face the golem.
+      if (distance > 1e-4) {
+        enemy.mesh.rotation.y = Math.atan2(dx, dz);
+      }
+
+      // Fire when roughly in range and not fleeing.
       enemy.fireTimer -= dt;
-      if (enemy.fireTimer <= 0 && distance < archerPreferredRange + archerRangeTolerance * 2 && distance > 1) {
+      if (!fleeing && enemy.fireTimer <= 0 && distance < prefRange + rangeTol * 2 && distance > 1) {
+        const origin = position.clone().add(new THREE.Vector3(0, enemyRadius, 0));
         const dir = new THREE.Vector3(dx / distance, 0, dz / distance);
-        spawnEnemyProjectile(position.clone().add(new THREE.Vector3(0, enemyRadius, 0)), dir);
-        enemy.fireTimer = 1 / archerFireRate + Math.random() * 0.2;
+        if (isMage) {
+          spawnMageProjectile(origin, dir);
+        } else {
+          spawnEnemyProjectile(origin, dir);
+        }
+        enemy.fireTimer = 1 / fireRate + Math.random() * 0.2;
       }
     } else {
-      // Brawler: rush straight at the golem.
-      const step = enemySpeed * dt;
+      // Brawler: rush straight at the golem (or flee).
+      let step = enemySpeed * speedMul * dt;
+      if (fleeing) {
+        step *= -1;
+      }
       if (distance > 1e-4) {
-        const travel = Math.min(step, distance);
+        const travel = Math.min(Math.abs(step), distance) * Math.sign(step);
         position.x += (dx / distance) * travel;
         position.z += (dz / distance) * travel;
         enemy.mesh.rotation.y = Math.atan2(dx, dz);
