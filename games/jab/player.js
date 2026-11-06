@@ -40,12 +40,23 @@ const hitPoint = new THREE.Vector3();
 const moveStep = new THREE.Vector3();
 let projectileGeometry = null; // one shared sphere, made on first shot
 
-// Try to load the Blender-exported golem model; fall back to procedural boxes if it fails.
-let golemTemplate = null;
-try {
-  golemTemplate = await new GLTFLoader().loadAsync('assets/golem.glb?v=5');
-} catch (err) {
-  console.warn('Golem model not loaded, using procedural fallback', err);
+// Load the Flow Studio golem models. Base is used for water; fire and earth have their own forms.
+const golemTemplates = { base: null, fire: null, earth: null };
+async function loadGolemModel(key, file) {
+  try {
+    golemTemplates[key] = await new GLTFLoader().loadAsync(file);
+  } catch (err) {
+    console.warn(`Golem ${key} model not loaded`, err);
+  }
+}
+await Promise.all([
+  loadGolemModel('base', 'assets/golem.glb?v=5'),
+  loadGolemModel('fire', 'assets/golem_fire.glb?v=1'),
+  loadGolemModel('earth', 'assets/golem_earth.glb?v=1'),
+]);
+
+function hasAnyGolemModel() {
+  return golemTemplates.base || golemTemplates.fire || golemTemplates.earth;
 }
 
 // movement keys are matched on e.code ('KeyW') and on the plain letter, so either convention works
@@ -80,6 +91,47 @@ function lerpAngle(current, target, t) {
   return current + diff * Math.min(1, t);
 }
 
+function buildProceduralGolem(group) {
+  // Procedural fallback: a chunky body made of boxes.
+  const material = new THREE.MeshStandardMaterial({ color: GOLEM_COLOR, roughness: 0.8 });
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.7), material);
+  torso.position.y = 0.75;
+  group.add(torso);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.55), material);
+  head.position.y = 1.55;
+  group.add(head);
+
+  const shoulderL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.6, 0.45), material);
+  shoulderL.position.set(-0.62, 1.1, 0);
+  group.add(shoulderL);
+
+  const shoulderR = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.6, 0.45), material);
+  shoulderR.position.set(0.62, 1.1, 0);
+  group.add(shoulderR);
+}
+
+function attachModelForElement(group, type) {
+  // Remove any previous model.
+  for (let i = group.children.length - 1; i >= 0; i--) {
+    group.remove(group.children[i]);
+  }
+  // Pick the variant: fire/earth use their own model; water (and any fallback) uses base.
+  let key = 'base';
+  if (type === 'fire' && golemTemplates.fire) key = 'fire';
+  else if (type === 'earth' && golemTemplates.earth) key = 'earth';
+
+  if (golemTemplates[key]) {
+    const model = golemTemplates[key].scene.clone();
+    group.add(model);
+  } else if (hasAnyGolemModel()) {
+    const model = (golemTemplates.base || golemTemplates.fire || golemTemplates.earth).scene.clone();
+    group.add(model);
+  } else {
+    buildProceduralGolem(group);
+  }
+}
+
 export function createPlayer(scene) {
   // A restart builds a fresh golem: drop the old one and the shots it left in the air.
   if (activePlayer && activePlayer.group.parent) activePlayer.group.parent.remove(activePlayer.group);
@@ -87,49 +139,17 @@ export function createPlayer(scene) {
   clearFX();
 
   const group = new THREE.Group();
-  let representativeMesh = null;
-
-  if (golemTemplate) {
-    // Use the Blender-exported golem. Clone the scene so future restarts don't share it.
-    const model = golemTemplate.scene.clone();
-    group.add(model);
-    group.position.set(0, 0, 0);
-    scene.add(group);
-    representativeMesh = model;
-  } else {
-    // Procedural fallback: a chunky body made of boxes.
-    const material = new THREE.MeshStandardMaterial({ color: GOLEM_COLOR, roughness: 0.8 });
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.7), material);
-    torso.position.y = 0.75;
-    group.add(torso);
-    representativeMesh = torso;
-
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.55), material);
-    head.position.y = 1.55;
-    group.add(head);
-
-    const shoulderL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.6, 0.45), material);
-    shoulderL.position.set(-0.62, 1.1, 0);
-    group.add(shoulderL);
-
-    const shoulderR = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.6, 0.45), material);
-    shoulderR.position.set(0.62, 1.1, 0);
-    group.add(shoulderR);
-
-    group.position.set(0, 0, 0);
-    scene.add(group);
-  }
-
+  group.position.set(0, 0, 0);
+  scene.add(group);
   shotScene = scene;
   fireTimer = 0;
 
   const player = {
     group,
-    mesh: representativeMesh, // one representative mesh for setElement to recolour
     hp: playerHP,
     maxHp: playerHP,
     dead: false,
-    element: 'fire',
+    element: null,
     facing: new THREE.Vector3(0, 0, 1), // where the next shot goes
   };
   setElement(player, 'fire');
@@ -137,35 +157,19 @@ export function createPlayer(scene) {
   return player;
 }
 
-function updateVariantVisibility(player) {
-  const active = player.element;
-  player.group.traverse((child) => {
-    if (!child.isMesh || !child.name) return;
-    const name = child.name;
-    if (name.startsWith('fire_') || name.startsWith('water_') || name.startsWith('earth_')) {
-      const prefix = name.split('_')[0];
-      child.visible = prefix === active;
-    } else {
-      child.visible = true;
-    }
-  });
-}
-
 export function setElement(player, type) {
+  if (player.element !== type) {
+    attachModelForElement(player.group, type);
+  }
   player.element = type;
   const glow = new THREE.Color(elementColors[type] ?? GOLEM_COLOR);
-  const base = new THREE.Color(GOLEM_COLOR);
   player.group.traverse((child) => {
     if (child.isMesh && child.material) {
-      // Keep textured materials looking like their baked texture; recolour only plain materials.
-      if (!child.material.map) {
-        child.material.color.copy(base);
-      }
+      // Keep textured materials looking like their baked texture.
       child.material.emissive.copy(glow);
       child.material.emissiveIntensity = 0.55;
     }
   });
-  updateVariantVisibility(player);
 }
 
 export function getElement(player) {

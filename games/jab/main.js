@@ -14,7 +14,7 @@ import {
   enemyElementDropChance,
   archerProjectileRadius, archerProjectileDamage,
 } from './tuning.js';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=3';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement } from './player.js?v=4';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
@@ -117,11 +117,103 @@ const grid = new THREE.GridHelper(arenaSize * 2, arenaSize, '#f2f2f2', '#a5a5a5'
 grid.position.y = 0.02;
 scene.add(grid);
 
-// --- Walls (perimeter + internal) -------------------------------------------
-const wallMaterial = new THREE.MeshStandardMaterial({ color: '#4a4a4a', roughness: 0.9 });
+// --- Procedural stone textures for walls and columns -------------------------
+function createStoneTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#5c5c5c';
+  c.fillRect(0, 0, size, size);
+  // mottled noise
+  for (let i = 0; i < 60000; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const shade = Math.random() < 0.5 ? '#666666' : '#525252';
+    c.fillStyle = shade;
+    c.fillRect(x, y, 2, 2);
+  }
+  // large block mortar lines
+  c.strokeStyle = '#3a3a3a';
+  c.lineWidth = 2;
+  const blocks = 4;
+  const step = size / blocks;
+  for (let i = 1; i < blocks; i++) {
+    c.beginPath();
+    c.moveTo(i * step, 0);
+    c.lineTo(i * step, size);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(0, i * step);
+    c.lineTo(size, i * step);
+    c.stroke();
+  }
+  // cracks
+  for (let i = 0; i < 12; i++) {
+    c.beginPath();
+    let x = Math.random() * size;
+    let y = Math.random() * size;
+    c.moveTo(x, y);
+    for (let j = 0; j < 6; j++) {
+      x += (Math.random() - 0.5) * 80;
+      y += (Math.random() - 0.5) * 80;
+      c.lineTo(x, y);
+    }
+    c.strokeStyle = Math.random() < 0.5 ? '#2a2a2a' : '#707070';
+    c.lineWidth = 1;
+    c.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createStoneBumpMap() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#808080';
+  c.fillRect(0, 0, size, size);
+  for (let i = 0; i < 30000; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const v = Math.floor(Math.random() * 60 + 90).toString(16).padStart(2, '0');
+    c.fillStyle = `#${v}${v}${v}`;
+    c.fillRect(x, y, 2, 2);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+const stoneTexture = createStoneTexture();
+const stoneBump = createStoneBumpMap();
+const wallMaterial = new THREE.MeshStandardMaterial({
+  map: stoneTexture,
+  bumpMap: stoneBump,
+  bumpScale: 0.05,
+  roughness: 0.92,
+  color: '#8e8e8e',
+});
+
 const walls = [];
 function addWall(x, z, w, d) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, wallHeight, d), wallMaterial);
+  const u = w / 8;
+  const v = d / 8;
+  const texture = stoneTexture.clone();
+  texture.repeat.set(Math.max(1, Math.round(u)), Math.max(1, Math.round(v)));
+  const bump = stoneBump.clone();
+  bump.repeat.set(Math.max(1, Math.round(u)), Math.max(1, Math.round(v)));
+  const material = wallMaterial.clone();
+  material.map = texture;
+  material.bumpMap = bump;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, wallHeight, d), material);
   mesh.position.set(x, wallHeight / 2, z);
   scene.add(mesh);
   walls.push({ x, z, halfW: w / 2, halfD: d / 2 });
@@ -318,10 +410,36 @@ function clearColumns() {
   columnMeshes.length = 0;
 }
 
+function createColumnMesh() {
+  const shaftHeight = 4;
+  const shaftGeo = new THREE.CylinderGeometry(columnRadius * 0.8, columnRadius * 0.85, shaftHeight, 16);
+  const baseGeo = new THREE.CylinderGeometry(columnRadius * 1.1, columnRadius * 1.2, 0.3, 16);
+  baseGeo.translate(0, 0.15, 0);
+  const capGeo = new THREE.CylinderGeometry(columnRadius * 1.1, columnRadius * 0.9, 0.3, 16);
+  capGeo.translate(0, shaftHeight - 0.15, 0);
+
+  const columnTexture = stoneTexture.clone();
+  columnTexture.repeat.set(1, 1);
+  const columnBump = stoneBump.clone();
+  columnBump.repeat.set(1, 1);
+  const material = new THREE.MeshStandardMaterial({
+    map: columnTexture,
+    bumpMap: columnBump,
+    bumpScale: 0.04,
+    roughness: 0.9,
+    color: '#8e8e8e',
+  });
+
+  const group = new THREE.Group();
+  const shaft = new THREE.Mesh(shaftGeo, material);
+  const base = new THREE.Mesh(baseGeo, material);
+  const cap = new THREE.Mesh(capGeo, material);
+  group.add(shaft, base, cap);
+  return group;
+}
+
 function createColumns(scene, count) {
   clearColumns();
-  const geometry = new THREE.CylinderGeometry(columnRadius, columnRadius, 4, 16);
-  const material = new THREE.MeshStandardMaterial({ color: '#4a4a4a' });
   const positions = [];
   const playerStart = new THREE.Vector3(0, 0, 0);
 
@@ -351,12 +469,11 @@ function createColumns(scene, count) {
     }
     if (!pos) continue;
     positions.push(pos);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(pos);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-    columnMeshes.push(mesh);
+    const column = createColumnMesh();
+    column.position.copy(pos);
+    column.position.y = 0;
+    scene.add(column);
+    columnMeshes.push(column);
   }
 }
 
