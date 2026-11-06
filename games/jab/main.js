@@ -23,6 +23,7 @@ import {
 } from './enemies.js?v=6';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { spawnItemAt, updateItems, clearItems, itemTypeFor } from './items.js?v=1';
+import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
 import { buildMap } from './level.js?v=4';
 import {
@@ -224,6 +225,7 @@ let playerXP = 0;
 let xpToNext = xpBase;
 let contactTimer = 0;
 const itemBuffs = { damage: { timer: 0, mul: 1 }, speed: { timer: 0, mul: 1 }, fireRate: { timer: 0, mul: 1 } };
+let runStats = createStats();
 let waveTimer = 0;
 let shownHp = null;
 let screenShake = 0;
@@ -364,6 +366,7 @@ function restart() {
   player.upgrades = { damage: 1, speed: 1, maxHp: 1, fireRate: 1 };
   player.buffs = { damage: 1, speed: 1, fireRate: 1 };
   for (const key of Object.keys(itemBuffs)) { itemBuffs[key].timer = 0; itemBuffs[key].mul = 1; }
+  runStats = createStats();
   player.hp = maxHp();
   player.dead = false;
   player.group.position.set(0, player.group.position.y, 0);
@@ -455,6 +458,8 @@ function killEnemy(enemy, deathPos) {
   score += 1;
   playHit(player.element);
   addXP(xpForEnemy(enemy));
+  recordKill(runStats, enemy);
+  applyNewAchievements();
   if (Math.random() < enemyElementDropChance) {
     spawnElementFieldAt(scene, deathPos);
   }
@@ -467,6 +472,17 @@ function xpForEnemy(enemy) {
   let xp = xpValues[enemy.role] ?? xpValues.brawler;
   if (enemy.personality === 'hero') xp *= xpValues.heroMul ?? 1;
   return Math.floor(xp);
+}
+
+function applyNewAchievements() {
+  for (const ach of checkAchievements(runStats)) {
+    player.upgrades[ach.reward.key] *= ach.reward.mul;
+    if (ach.reward.key === 'maxHp') {
+      const ratio = player.hp / maxHp();
+      player.hp = maxHp() * Math.max(0.1, ratio);
+    }
+    showBanner(`Achievement: ${ach.label}`, ach.desc, 2500);
+  }
 }
 
 function applyItem(type) {
@@ -717,6 +733,8 @@ function update(dt) {
         attachHealthBars();
       } else {
         floor += 1;
+        recordFloor(runStats, floor);
+        applyNewAchievements();
         waveInFloor = 1;
         screenShake += screenShakeAmount * 2;
         showBanner('Floor Complete', `Descending to floor ${floor}`, 1500);
