@@ -21,11 +21,11 @@ import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=6';
-import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
+import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=3';
 import { spawnItemAt, updateItems, clearItems, itemTypeFor } from './items.js?v=1';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
-import { buildMap } from './level.js?v=7';
+import { buildMap } from './level.js?v=8';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns,
 } from './abilities.js?v=3';
@@ -60,10 +60,15 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight('#555555', '#111111', 1.0));
-const sun = new THREE.DirectionalLight('#6a7a8a', 1.2);
+scene.add(new THREE.HemisphereLight('#555555', '#111111', 1.3));
+const sun = new THREE.DirectionalLight('#7a8a9a', 1.4);
 sun.position.set(8, 16, 6);
 scene.add(sun);
+
+// Soft cool fill from the opposite side so shadows aren't pure black.
+const fill = new THREE.DirectionalLight('#3a4a5a', 0.5);
+fill.position.set(-8, 8, -6);
+scene.add(fill);
 
 // --- Floor texture -----------------------------------------------------------
 // Use the Flow Studio floor image from assets. A plain grey material is shown

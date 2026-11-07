@@ -33,6 +33,11 @@ function createFieldMesh(scene, type, x, z) {
   ring.position.y = 0.9;
   group.add(ring);
 
+  // Small local light so the element pools read clearly in the dark.
+  const light = new THREE.PointLight(color, 1.8, 10);
+  light.position.y = 0.8;
+  group.add(light);
+
   group.position.set(x, 0, z);
   scene.add(group);
   return { group, ring };

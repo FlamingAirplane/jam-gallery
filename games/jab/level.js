@@ -261,6 +261,16 @@ export function buildMap(scene, floor = 1) {
   addCrenellations(scene, -half - thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
   addCrenellations(scene, half + thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
 
+  // --- Perimeter lighting (corners + midpoints) -------------------------------
+  addTorch(scene, half, half, 3.5);
+  addTorch(scene, -half, half, 3.5);
+  addTorch(scene, half, -half, 3.5);
+  addTorch(scene, -half, -half, 3.5);
+  addTorch(scene, 0, -half, 3.5);
+  addTorch(scene, 0, half, 3.5);
+  addTorch(scene, -half, 0, 3.5);
+  addTorch(scene, half, 0, 3.5);
+
   // --- Central safe disc ------------------------------------------------------
   const centralR = 8 + rng() * 6;
   createCentralDisc(scene, centralR);
@@ -296,6 +306,7 @@ export function buildMap(scene, floor = 1) {
       if (overlap) continue;
 
       addWall(scene, walls, wallMeshes, x, z, w, d, wallHeight, stoneTexture, stoneBump);
+      addTorch(scene, x, z, 3.0);
       placed = true;
     }
   }
