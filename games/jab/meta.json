@@ -44,5 +44,5 @@
       "license": "Flow Studio Pro - full commercial use permitted"
     }
   ],
-  "ai_assets": ["assets/make_golem.py", "assets/make_flow_models.py", "assets/gen_fireball.py", "assets/fireball_spritesheet.png"]
+  "ai_assets": ["assets/make_golem.py", "assets/make_flow_models.py", "assets/gen_fireball.py", "assets/fireball_spritesheet.png", "assets/gen_water_orb.py", "assets/water_orb_spritesheet.png"]
 }

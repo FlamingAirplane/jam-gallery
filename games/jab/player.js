@@ -28,7 +28,8 @@ import {
 } from './tuning.js?v=1';
 import { spawnMuzzleFlash, spawnProjectileTrailDot, clearFX } from './fx.js?v=2';
 import { playShoot } from './audio.js?v=2';
-import { createFireball, updateFireball, removeFireball } from './fireball.js?v=1';
+import { createFireball, updateFireball } from './fireball.js?v=1';
+import { createWaterOrb, updateWaterOrb } from './waterorb.js?v=1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const GOLEM_COLOR = '#8e9196';
@@ -275,6 +276,7 @@ export function updateProjectiles(dt) {
     shot.traveled += step;
 
     if (shot.fireball) updateFireball(shot.fireball, dt);
+    if (shot.waterOrb) updateWaterOrb(shot.waterOrb, dt);
 
     shot.trailTimer += dt;
     if (shot.trailTimer >= trailSpawnInterval) {
@@ -302,11 +304,13 @@ function spawnShot(player) {
   let damage = projectileDamage * player.upgrades.damage * player.buffs.damage;
   let pierce;
   let fireball = null;
+  let waterOrb = null;
 
   if (element === 'water') {
-    // Thinner, longer piercing beam.
-    mesh = new THREE.Mesh(projectileGeometry, material);
-    mesh.scale.set(0.5, 0.5, 2.5);
+    // Looping sprite-sheet water orb.
+    waterOrb = createWaterOrb(shotScene, 1.2);
+    mesh = waterOrb.sprite;
+    mesh.material.color = new THREE.Color(elementColors.water);
     speed = waterProjectileSpeed;
     pierce = waterPierceCount;
   } else if (element === 'earth') {
@@ -349,6 +353,7 @@ function spawnShot(player) {
     trailTimer: 0,
     element,
     fireball: element === 'fire' ? fireball : undefined,
+    waterOrb: element === 'water' ? waterOrb : undefined,
   });
 }
 
