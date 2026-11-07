@@ -171,9 +171,11 @@ function addPillar(scene, columns, x, z, texture, bump) {
 
 const MAX_DYNAMIC_TORCHES = 8;
 let dynamicTorchCount = 0;
+let lightPositions = [];
 
 function addTorch(scene, x, z, y = 3.2, lit = true) {
   // Only the first few torches cast real point light; the rest are emissive fakes.
+  lightPositions.push({ x, z });
   if (lit && dynamicTorchCount < MAX_DYNAMIC_TORCHES) {
     const light = new THREE.PointLight('#ffaa44', 5, 18);
     light.position.set(x, y, z);
@@ -191,6 +193,7 @@ function addTorch(scene, x, z, y = 3.2, lit = true) {
 
 function addCandle(scene, x, z) {
   // Small static candle: emissive flame, no dynamic light (baked look, cheap).
+  lightPositions.push({ x, z });
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(0.08, 0.1, 0.35, 8),
     new THREE.MeshStandardMaterial({ color: '#4a3a2a', roughness: 1 })
@@ -204,6 +207,41 @@ function addCandle(scene, x, z) {
   flame.position.set(x, 0.48, z);
 
   scene.add(base, flame);
+}
+
+export function createLightmapTexture(positions) {
+  // Procedural lightmap baked from torch/candle positions.
+  const size = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#7f7f7f';
+  c.fillRect(0, 0, size, size);
+
+  for (const pos of positions) {
+    const u = (pos.x + arenaSize) / (arenaSize * 2);
+    const v = 1 - (pos.z + arenaSize) / (arenaSize * 2);
+    const cx = u * size;
+    const cy = v * size;
+    const g = c.createRadialGradient(cx, cy, 2, cx, cy, 140);
+    g.addColorStop(0, 'rgba(255, 170, 68, 0.45)');
+    g.addColorStop(0.55, 'rgba(255, 170, 68, 0.08)');
+    g.addColorStop(1, 'rgba(255, 170, 68, 0)');
+    c.fillStyle = g;
+    c.fillRect(cx - 140, cy - 140, 280, 280);
+  }
+
+  // Vignette darkening near the outer walls.
+  const vignette = c.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.85);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+  c.fillStyle = vignette;
+  c.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 function createCentralDisc(scene, radius = 10) {
@@ -267,6 +305,7 @@ function rectCircleDistance(rx, rz, rw, rd, cx, cz) {
 
 export function buildMap(scene, floor = 1) {
   dynamicTorchCount = 0;
+  lightPositions = [];
   const walls = [];
   const wallMeshes = [];
   const columns = [];
@@ -388,5 +427,5 @@ export function buildMap(scene, floor = 1) {
     }
   }
 
-  return { walls, wallMeshes, columns };
+  return { walls, wallMeshes, columns, lightPositions };
 }

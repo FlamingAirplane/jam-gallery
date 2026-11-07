@@ -25,7 +25,7 @@ import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElemen
 import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=3';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
-import { buildMap } from './level.js?v=11';
+import { buildMap, createLightmapTexture } from './level.js?v=12';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
 } from './abilities.js?v=4';
@@ -110,6 +110,13 @@ function createLevel(scene, floorNumber = 1) {
   const level = buildMap(scene, floorNumber);
   walls = level.walls;
   columnMeshes.push(...level.columns);
+
+  // Bake a lightmap from the static torch/candle positions and apply it to the floor.
+  const lightmap = createLightmapTexture(level.lightPositions);
+  floorMesh.geometry.setAttribute('uv2', new THREE.BufferAttribute(floorMesh.geometry.attributes.uv.array.slice(), 2));
+  floorMesh.material.lightMap = lightmap;
+  floorMesh.material.lightMapIntensity = 1.2;
+  floorMesh.material.needsUpdate = true;
 }
 
 // --- Input -------------------------------------------------------------------
