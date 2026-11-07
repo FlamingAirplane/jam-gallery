@@ -7,7 +7,7 @@ import {
   earthquakeRadius, earthquakeDamage, earthquakeKnockback, earthquakeDuration,
   windGustSpeed, windGustWidth, windGustRange, windGustDamage, windGustKnockback,
   elementColors,
-} from './tuning.js';
+} from './tuning.js?v=1';
 
 const abilities = [];
 const cooldowns = { fire: 0, water: 0, earth: 0 };

@@ -25,7 +25,7 @@ import {
   arrowTurnSpeed,
   waterSpeedBoostMul,
   waterSpeedBoostDuration,
-} from './tuning.js';
+} from './tuning.js?v=1';
 import { spawnMuzzleFlash, spawnProjectileTrailDot, clearFX } from './fx.js?v=2';
 import { playShoot } from './audio.js?v=2';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -172,9 +172,14 @@ export function setElement(player, type) {
   player.element = type;
   player.group.traverse((child) => {
     if (child.isMesh && child.material) {
-      // Keep the baked texture; no elemental tint.
-      child.material.emissive.setHex(0x000000);
-      child.material.emissiveIntensity = 0;
+      // Earth gets a brown tint so the asset reads as earth rather than purple.
+      if (type === 'earth') {
+        child.material.emissive.set(elementColors.earth);
+        child.material.emissiveIntensity = 0.35;
+      } else {
+        child.material.emissive.setHex(0x000000);
+        child.material.emissiveIntensity = 0;
+      }
       // Remove specular sheen.
       child.material.roughness = 1;
       child.material.metalness = 0;

@@ -96,7 +96,7 @@ export const elementTypes = ['fire', 'water', 'earth', 'wind'];
 export const elementColors = {
   fire: '#e74c3c',   // warm red-orange
   water: '#3498db',  // cool blue
-  earth: '#8e44ad',  // stone purple / brownish
+  earth: '#8B4513',  // saddle brown
   wind: '#95a5a6',   // pale silver / air
 };
 

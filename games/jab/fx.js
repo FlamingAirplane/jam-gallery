@@ -5,7 +5,7 @@ import {
   burstParticleCount,
   burstLifetime,
   trailSpawnInterval,
-} from './tuning.js';
+} from './tuning.js?v=1';
 
 const flashes = [];
 const burstParticles = [];

@@ -3,7 +3,7 @@ import {
   enemyHealthBarWidth, enemyHealthBarHeight, enemyHealthBarYOffset,
   enemyHealthBarColor, enemyHealthBarBg,
   spawnIndicatorSize, spawnIndicatorColor, elementColors,
-} from './tuning.js';
+} from './tuning.js?v=1';
 
 const GREY = { dark: '#1a1a1a', mid: '#3a3a3a', light: '#5c5c5c', pale: '#999999', white: '#d4d4d4', blood: '#8b0000' };
 

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import {
   arenaSize, wallHeight, columnRadius, columnCount, columnMinDistanceFromPlayer,
   internalWallCount, internalWallLength, internalWallThickness, floorWallMargin,
-} from './tuning.js';
+} from './tuning.js?v=1';
 
 const STONE_COLOR = '#3a3a3a';
 

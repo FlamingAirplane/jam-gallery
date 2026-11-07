@@ -16,7 +16,7 @@ import {
   burnDamagePerSecond, burnDuration,
   earthSlowMul, earthSlowDuration,
   elementColors,
-} from './tuning.js';
+} from './tuning.js?v=1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const BRAWLER_COLOR = '#4a4a4a';
