@@ -21,11 +21,11 @@ import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=6';
-import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=3';
-import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=2';
+import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=4';
+import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=3';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
-import { buildMap } from './level.js?v=8';
+import { buildMap } from './level.js?v=9';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
 } from './abilities.js?v=4';
@@ -58,7 +58,7 @@ camera.position.set(
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
@@ -243,6 +243,8 @@ const liveEnemies = () => getEnemies().filter(alive).length;
 const distanceXZ = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 function ensureHealthBar(enemy) {
+  // Only show overhead bars for notable enemies to keep DOM updates cheap.
+  if (enemy.personality !== 'hero' && enemy.personality !== 'leader') return;
   if (!enemy.healthBar) {
     enemy.healthBar = createEnemyHealthBar();
     enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
@@ -684,7 +686,7 @@ function update(dt) {
     if (alive(enemy)) {
       resolveColumnCollisions(enemy.mesh.position, enemy.radius ?? enemyRadius);
       resolveWallCollisions(enemy.mesh.position, enemy.radius ?? enemyRadius);
-      if (enemy.healthBar) {
+      if (enemy.healthBar && (frameCount & 1) === 0) {
         positionEnemyHealthBar(enemy.healthBar.element, enemy.mesh.position, camera, renderer);
       }
     }
@@ -696,7 +698,7 @@ function update(dt) {
   updateElementFields(dt);
 
   // Item pickups and buff timers.
-  const pickups = updateItems(dt, player.group.position);
+  const pickups = updateItems(dt, player.group.position, performance.now());
   for (const itemType of pickups) applyItem(itemType);
   for (const key of Object.keys(itemBuffs)) {
     if (itemBuffs[key].timer > 0) {
@@ -785,9 +787,11 @@ function update(dt) {
 }
 
 const clock = new THREE.Clock();
+let frameCount = 0;
 let fpsAccumulator = 0;
 let fpsFrames = 0;
 renderer.setAnimationLoop(() => {
+  frameCount += 1;
   const dt = Math.min(clock.getDelta(), 0.05);   // a tab switch must not teleport the world
   const t0 = performance.now();
   if (state === 'playing') update(dt);
@@ -797,19 +801,18 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
   const t2 = performance.now();
 
-  let pointLights = 0;
-  scene.traverse((obj) => { if (obj.isPointLight) pointLights += 1; });
+  const activeFields = getElementFields().filter(alive).length;
 
   updateDebug(dt, {
     updateMs: t1 - t0,
     renderMs: t2 - t1,
     drawCalls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
-    pointLights,
+    pointLights: 4 + activeFields,
     enemies: getEnemies().filter(alive).length,
     projectiles: getProjectiles().filter(alive).length,
     enemyProjectiles: getEnemyProjectiles().filter(alive).length,
-    fields: getElementFields().filter(alive).length,
+    fields: activeFields,
     items: getItems().length,
     abilities: getAbilityCount(),
     healthBars: getHealthBarCount(),

@@ -169,7 +169,7 @@ function addPillar(scene, columns, x, z, texture, bump) {
   columns.push(group);
 }
 
-const MAX_DYNAMIC_TORCHES = 6;
+const MAX_DYNAMIC_TORCHES = 4;
 let dynamicTorchCount = 0;
 
 function addTorch(scene, x, z, y = 3.2, lit = true) {

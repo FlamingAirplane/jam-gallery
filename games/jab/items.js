@@ -50,7 +50,7 @@ export function spawnItemAt(scene, position, key = null) {
   return items[items.length - 1];
 }
 
-export function updateItems(dt, playerPos) {
+export function updateItems(dt, playerPos, now = performance.now()) {
   const pickups = [];
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i];
@@ -58,7 +58,7 @@ export function updateItems(dt, playerPos) {
 
     // Bob and spin.
     item.visual.rotation.y += dt * 2;
-    item.visual.position.y = 0.7 + Math.sin(performance.now() * 0.004 + i) * 0.1;
+    item.visual.position.y = 0.7 + Math.sin(now * 0.004 + i) * 0.1;
 
     const dx = playerPos.x - item.mesh.position.x;
     const dz = playerPos.z - item.mesh.position.z;
