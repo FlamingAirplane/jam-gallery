@@ -96,31 +96,35 @@ function wallMaterialFor(texture, bump, w, d) {
   });
 }
 
-function addWall(scene, walls, wallMeshes, x, z, w, d, h = wallHeight, texture, bump) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMaterialFor(texture, bump, w, d));
+function addWall(scene, walls, wallMeshes, x, z, w, d, h = wallHeight, texture, bump, isBorder = false) {
+  const material = wallMaterialFor(texture, bump, w, d);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   mesh.position.set(x, h / 2, z);
+  mesh.userData.isBorder = isBorder;
+  if (isBorder) mesh.userData.baseOpacity = 1.0;
   scene.add(mesh);
-  walls.push({ x, z, halfW: w / 2, halfD: d / 2 });
+  walls.push({ x, z, halfW: w / 2, halfD: d / 2, isBorder });
   wallMeshes.push(mesh);
-  return mesh;
+  return { mesh, material };
 }
 
-function addCrenellations(scene, x, z, w, d, texture, bump) {
+function addCrenellations(scene, x, z, w, d, texture, bump, outMeshes = null) {
   // Small square blocks along the top outer edge of a perimeter wall.
   const size = 1.2;
   const gap = 2.4;
   const h = 0.8;
-  const mat = wallMaterialFor(texture, bump, size, size);
   const isHorizontal = w > d;
   const length = isHorizontal ? w : d;
-  const steps = Math.floor(length / gap);
+  const steps = Math.max(1, Math.floor(length / gap));
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps - 0.5) * length;
     const mx = isHorizontal ? x + t : x + (w > 0 ? w / 2 - size / 2 : 0);
     const mz = isHorizontal ? z + (d > 0 ? d / 2 - size / 2 : 0) : z + t;
-    const block = new THREE.Mesh(new THREE.BoxGeometry(size, h, size), mat);
+    const block = new THREE.Mesh(new THREE.BoxGeometry(size, h, size), wallMaterialFor(texture, bump, size, size));
     block.position.set(mx, wallHeight + h / 2, mz);
+    block.userData.isWall = true;
     scene.add(block);
+    if (outMeshes) outMeshes.push(block);
   }
 }
 
@@ -308,6 +312,7 @@ export function buildMap(scene, floor = 1) {
   lightPositions = [];
   const walls = [];
   const wallMeshes = [];
+  const crenellationMeshes = [];
   const columns = [];
 
   const half = arenaSize;
@@ -316,14 +321,14 @@ export function buildMap(scene, floor = 1) {
 
   // --- Perimeter walls with crenellations ------------------------------------
   const outerLong = half * 2 + thickness;
-  addWall(scene, walls, wallMeshes, 0, -half - thickness / 2, outerLong, thickness, wallHeight, stoneTexture, stoneBump);
-  addWall(scene, walls, wallMeshes, 0, half + thickness / 2, outerLong, thickness, wallHeight, stoneTexture, stoneBump);
-  addWall(scene, walls, wallMeshes, -half - thickness / 2, 0, thickness, outerLong, wallHeight, stoneTexture, stoneBump);
-  addWall(scene, walls, wallMeshes, half + thickness / 2, 0, thickness, outerLong, wallHeight, stoneTexture, stoneBump);
-  addCrenellations(scene, 0, -half - thickness / 2, outerLong, thickness, stoneTexture, stoneBump);
-  addCrenellations(scene, 0, half + thickness / 2, outerLong, thickness, stoneTexture, stoneBump);
-  addCrenellations(scene, -half - thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
-  addCrenellations(scene, half + thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
+  addWall(scene, walls, wallMeshes, 0, -half - thickness / 2, outerLong, thickness, wallHeight, stoneTexture, stoneBump, true);
+  addWall(scene, walls, wallMeshes, 0, half + thickness / 2, outerLong, thickness, wallHeight, stoneTexture, stoneBump, true);
+  addWall(scene, walls, wallMeshes, -half - thickness / 2, 0, thickness, outerLong, wallHeight, stoneTexture, stoneBump, true);
+  addWall(scene, walls, wallMeshes, half + thickness / 2, 0, thickness, outerLong, wallHeight, stoneTexture, stoneBump, true);
+  addCrenellations(scene, 0, -half - thickness / 2, outerLong, thickness, stoneTexture, stoneBump, crenellationMeshes);
+  addCrenellations(scene, 0, half + thickness / 2, outerLong, thickness, stoneTexture, stoneBump, crenellationMeshes);
+  addCrenellations(scene, -half - thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump, crenellationMeshes);
+  addCrenellations(scene, half + thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump, crenellationMeshes);
 
   // --- Perimeter lighting (corners + midpoints) -------------------------------
   // Corner fixtures are emissive only; midpoints get real point lights.
@@ -427,5 +432,5 @@ export function buildMap(scene, floor = 1) {
     }
   }
 
-  return { walls, wallMeshes, columns, lightPositions };
+  return { walls, wallMeshes, crenellationMeshes, columns, lightPositions };
 }

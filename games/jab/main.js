@@ -25,7 +25,7 @@ import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElemen
 import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=5';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=5';
-import { buildMap, createLightmapTexture } from './level.js?v=12';
+import { buildMap, createLightmapTexture } from './level.js?v=13';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
 } from './abilities.js?v=4';
@@ -96,9 +96,19 @@ new THREE.TextureLoader().load('assets/L_Floor2.jpeg?v=1', (texture) => {
 
 // --- Level layout (inspired by Map_Base.png) ---------------------------------
 let walls = [];
+let wallMeshes = [];
+let crenellationMeshes = [];
 let columnMeshes = [];
 
 function clearLevel() {
+  for (const mesh of wallMeshes) {
+    if (mesh.parent) mesh.parent.remove(mesh);
+  }
+  wallMeshes.length = 0;
+  for (const mesh of crenellationMeshes) {
+    if (mesh.parent) mesh.parent.remove(mesh);
+  }
+  crenellationMeshes.length = 0;
   for (const mesh of columnMeshes) {
     if (mesh.parent) mesh.parent.remove(mesh);
   }
@@ -109,6 +119,8 @@ function createLevel(scene, floorNumber = 1) {
   clearLevel();
   const level = buildMap(scene, floorNumber);
   walls = level.walls;
+  wallMeshes = level.wallMeshes;
+  crenellationMeshes = level.crenellationMeshes;
   columnMeshes.push(...level.columns);
 
   // Bake a lightmap from the static torch/candle positions and apply it to the floor.
@@ -117,6 +129,54 @@ function createLevel(scene, floorNumber = 1) {
   floorMesh.material.lightMap = lightmap;
   floorMesh.material.lightMapIntensity = 1.2;
   floorMesh.material.needsUpdate = true;
+}
+
+// --- Wall transparency (Sims-style: fade walls that occlude player/enemies) --
+const WALL_FADE_DISTANCE = 5.5;
+const WALL_MIN_OPACITY = 0.12;
+
+function distanceToWall(position, wall) {
+  const closestX = Math.max(wall.x - wall.halfW, Math.min(position.x, wall.x + wall.halfW));
+  const closestZ = Math.max(wall.z - wall.halfD, Math.min(position.z, wall.z + wall.halfD));
+  return Math.hypot(position.x - closestX, position.z - closestZ);
+}
+
+function setWallOpacity(mesh, opacity) {
+  const mat = mesh.material;
+  if (opacity < 1.0) {
+    mat.transparent = true;
+    mat.opacity = Math.max(WALL_MIN_OPACITY, opacity);
+  } else {
+    mat.transparent = false;
+    mat.opacity = 1.0;
+  }
+  mat.needsUpdate = true;
+}
+
+function updateWallTransparency() {
+  const positions = [player.group.position];
+  for (const enemy of getEnemies()) {
+    if (alive(enemy)) positions.push(enemy.mesh.position);
+  }
+
+  for (let i = 0; i < wallMeshes.length; i++) {
+    const wall = walls[i];
+    let minDist = Infinity;
+    for (const pos of positions) {
+      minDist = Math.min(minDist, distanceToWall(pos, wall));
+    }
+    const opacity = minDist < WALL_FADE_DISTANCE ? minDist / WALL_FADE_DISTANCE : 1.0;
+    setWallOpacity(wallMeshes[i], opacity);
+  }
+
+  for (const mesh of crenellationMeshes) {
+    let minDist = Infinity;
+    for (const pos of positions) {
+      minDist = Math.min(minDist, Math.hypot(pos.x - mesh.position.x, pos.z - mesh.position.z));
+    }
+    const opacity = minDist < WALL_FADE_DISTANCE ? minDist / WALL_FADE_DISTANCE : 1.0;
+    setWallOpacity(mesh, opacity);
+  }
 }
 
 // --- Input -------------------------------------------------------------------
@@ -803,6 +863,8 @@ function update(dt) {
       setWave(waveInFloor, wavesPerFloor);
     }
   }
+
+  updateWallTransparency();
 
   setScore(score);
   setFloor(floor);
