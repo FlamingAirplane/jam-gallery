@@ -2,7 +2,7 @@
 // No image is copied; the layout is rebuilt from simple shapes.
 import * as THREE from 'three';
 import {
-  arenaSize, wallHeight, columnRadius, columnMinDistanceFromPlayer,
+  arenaSize, wallHeight, columnRadius, columnCount, columnMinDistanceFromPlayer,
   internalWallCount, internalWallLength, internalWallThickness, floorWallMargin,
 } from './tuning.js';
 
