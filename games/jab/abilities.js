@@ -44,8 +44,9 @@ function makeWaveMesh(element) {
 }
 
 function makeQuakeMesh() {
+  // A thin unit ring we scale each frame instead of rebuilding geometry.
   const mesh = new THREE.Mesh(
-    new THREE.RingGeometry(0.5, 1, 64),
+    new THREE.RingGeometry(0.45, 0.55, 64),
     new THREE.MeshStandardMaterial({
       color: elementColors.earth,
       transparent: true,
@@ -240,9 +241,7 @@ export function updateAbilities(dt, enemies, scene) {
       ab.elapsed += dt;
       const t = Math.min(1, ab.elapsed / ab.duration);
       const currentRadius = earthquakeRadius * t;
-      const inner = Math.max(0.2, currentRadius - 1.5);
-      ab.mesh.geometry.dispose();
-      ab.mesh.geometry = new THREE.RingGeometry(inner, currentRadius, 64);
+      ab.mesh.scale.set(currentRadius, currentRadius, 1);
 
       for (const enemy of enemies) {
         if (!alive(enemy) || ab.damaged.has(enemy)) continue;
@@ -286,4 +285,8 @@ export function clearAbilities(scene) {
 
 export function getCooldowns() {
   return { ...cooldowns };
+}
+
+export function getAbilityCount() {
+  return abilities.length;
 }

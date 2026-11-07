@@ -22,24 +22,26 @@ import {
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=6';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=3';
-import { spawnItemAt, updateItems, clearItems, itemTypeFor } from './items.js?v=1';
+import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=2';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
 import { buildMap } from './level.js?v=8';
 import {
-  triggerAbility, updateAbilities, clearAbilities, getCooldowns,
-} from './abilities.js?v=3';
+  triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
+} from './abilities.js?v=4';
 import {
   createUI, setScore, setFloor, setWave, setHealth, setLevel, setXP,
   setAbilityCooldown, setBuffs,
   showGameOver, hideGameOver,
   showLevelUp, hideLevelUp,
-  createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
+  createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars, getHealthBarCount,
   createSpawnIndicator, positionSpawnIndicator, showBanner,
 } from './ui.js?v=6';
+import { initDebug, updateDebug } from './debug.js?v=1';
 
 // --- Overlay -----------------------------------------------------------------
 const ui = createUI();
+initDebug();
 
 // --- Scene, camera, renderer -------------------------------------------------
 const scene = new THREE.Scene();
@@ -240,13 +242,15 @@ const alive = (thing) => thing.alive !== false;   // treat a missing flag as ali
 const liveEnemies = () => getEnemies().filter(alive).length;
 const distanceXZ = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
-function attachHealthBars() {
-  for (const enemy of getEnemies()) {
-    if (!enemy.healthBar) {
-      enemy.healthBar = createEnemyHealthBar();
-      enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
-    }
+function ensureHealthBar(enemy) {
+  if (!enemy.healthBar) {
+    enemy.healthBar = createEnemyHealthBar();
+    enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
   }
+}
+
+function attachHealthBars() {
+  // Health bars are created lazily when an enemy first takes damage.
 }
 
 function clearSpawnIndicators() {
@@ -327,26 +331,23 @@ function resolveWallCollisions(position, radius) {
 
 function separateEnemies() {
   const enemies = getEnemies();
-  // Run a couple of iterations so large clumps unpack in a single frame.
-  for (let pass = 0; pass < 2; pass++) {
-    for (let i = 0; i < enemies.length; i++) {
-      const a = enemies[i];
-      if (!alive(a)) continue;
-      for (let j = i + 1; j < enemies.length; j++) {
-        const b = enemies[j];
-        if (!alive(b)) continue;
-        const dx = b.mesh.position.x - a.mesh.position.x;
-        const dz = b.mesh.position.z - a.mesh.position.z;
-        const dist = Math.hypot(dx, dz);
-        // Keep enemies slightly farther apart than their physical radii so they fan out.
-        const minDist = ((a.radius ?? enemyRadius) + (b.radius ?? enemyRadius)) * 1.3;
-        if (dist < minDist && dist > 0.001) {
-          const push = (minDist - dist) / dist * 0.55;
-          a.mesh.position.x -= dx * push;
-          a.mesh.position.z -= dz * push;
-          b.mesh.position.x += dx * push;
-          b.mesh.position.z += dz * push;
-        }
+  for (let i = 0; i < enemies.length; i++) {
+    const a = enemies[i];
+    if (!alive(a)) continue;
+    for (let j = i + 1; j < enemies.length; j++) {
+      const b = enemies[j];
+      if (!alive(b)) continue;
+      const dx = b.mesh.position.x - a.mesh.position.x;
+      const dz = b.mesh.position.z - a.mesh.position.z;
+      const dist = Math.hypot(dx, dz);
+      // Keep enemies slightly farther apart than their physical radii so they fan out.
+      const minDist = ((a.radius ?? enemyRadius) + (b.radius ?? enemyRadius)) * 1.3;
+      if (dist < minDist && dist > 0.001) {
+        const push = (minDist - dist) / dist * 0.55;
+        a.mesh.position.x -= dx * push;
+        a.mesh.position.z -= dz * push;
+        b.mesh.position.x += dx * push;
+        b.mesh.position.z += dz * push;
       }
     }
   }
@@ -544,7 +545,8 @@ function levelUp() {
 function damageEnemy(enemy, damage) {
   if (!alive(enemy)) return;
   enemy.hp -= damage;
-  if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
+  ensureHealthBar(enemy);
+  enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
   if (enemy.hp <= 0) {
     killEnemy(enemy, enemy.mesh.position.clone());
   }
@@ -559,7 +561,8 @@ function hitEnemies() {
       const reach = projectileRadius + (enemy.radius ?? enemyRadius);
       if (distanceXZ(shot.mesh.position, enemy.mesh.position) < reach) {
         enemy.hp -= shot.damage ?? projectileDamage;
-        if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
+        ensureHealthBar(enemy);
+        enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
 
         // Elemental status effects.
         if (player.element === 'fire') enemy.burnTimer = burnDuration;
@@ -786,10 +789,31 @@ let fpsAccumulator = 0;
 let fpsFrames = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);   // a tab switch must not teleport the world
+  const t0 = performance.now();
   if (state === 'playing') update(dt);
   updateFX(dt);
+  const t1 = performance.now();
   updateCamera(dt);
   renderer.render(scene, camera);
+  const t2 = performance.now();
+
+  let pointLights = 0;
+  scene.traverse((obj) => { if (obj.isPointLight) pointLights += 1; });
+
+  updateDebug(dt, {
+    updateMs: t1 - t0,
+    renderMs: t2 - t1,
+    drawCalls: renderer.info.render.calls,
+    triangles: renderer.info.render.triangles,
+    pointLights,
+    enemies: getEnemies().filter(alive).length,
+    projectiles: getProjectiles().filter(alive).length,
+    enemyProjectiles: getEnemyProjectiles().filter(alive).length,
+    fields: getElementFields().filter(alive).length,
+    items: getItems().length,
+    abilities: getAbilityCount(),
+    healthBars: getHealthBarCount(),
+  });
 
   if (fpsPanel) {
     fpsAccumulator += dt;

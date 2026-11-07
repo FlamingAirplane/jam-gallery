@@ -78,3 +78,5 @@ export function clearItems(scene) {
   }
   items.length = 0;
 }
+
+export function getItems() { return items; }

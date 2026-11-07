@@ -331,6 +331,10 @@ export function clearEnemyHealthBars() {
   enemyBars.length = 0;
 }
 
+export function getHealthBarCount() {
+  return enemyBars.length;
+}
+
 // --- Spawn indicators --------------------------------------------------------
 export function createSpawnIndicator() {
   const element = document.createElement('div');

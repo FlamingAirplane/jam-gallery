@@ -169,10 +169,17 @@ function addPillar(scene, columns, x, z, texture, bump) {
   columns.push(group);
 }
 
-function addTorch(scene, x, z, y = 3.2) {
-  const light = new THREE.PointLight('#ffaa44', 4, 18);
-  light.position.set(x, y, z);
-  scene.add(light);
+const MAX_DYNAMIC_TORCHES = 6;
+let dynamicTorchCount = 0;
+
+function addTorch(scene, x, z, y = 3.2, lit = true) {
+  // Only the first few torches cast real point light; the rest are emissive fakes.
+  if (lit && dynamicTorchCount < MAX_DYNAMIC_TORCHES) {
+    const light = new THREE.PointLight('#ffaa44', 3, 14);
+    light.position.set(x, y, z);
+    scene.add(light);
+    dynamicTorchCount += 1;
+  }
   // Small emissive fixture mesh.
   const fixture = new THREE.Mesh(
     new THREE.BoxGeometry(0.3, 0.6, 0.3),
@@ -242,6 +249,7 @@ function rectCircleDistance(rx, rz, rw, rd, cx, cz) {
 }
 
 export function buildMap(scene, floor = 1) {
+  dynamicTorchCount = 0;
   const walls = [];
   const wallMeshes = [];
   const columns = [];
@@ -262,14 +270,15 @@ export function buildMap(scene, floor = 1) {
   addCrenellations(scene, half + thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
 
   // --- Perimeter lighting (corners + midpoints) -------------------------------
-  addTorch(scene, half, half, 3.5);
-  addTorch(scene, -half, half, 3.5);
-  addTorch(scene, half, -half, 3.5);
-  addTorch(scene, -half, -half, 3.5);
-  addTorch(scene, 0, -half, 3.5);
-  addTorch(scene, 0, half, 3.5);
-  addTorch(scene, -half, 0, 3.5);
-  addTorch(scene, half, 0, 3.5);
+  // Corner fixtures are emissive only; midpoints get real point lights.
+  addTorch(scene, half, half, 3.5, false);
+  addTorch(scene, -half, half, 3.5, false);
+  addTorch(scene, half, -half, 3.5, false);
+  addTorch(scene, -half, -half, 3.5, false);
+  addTorch(scene, 0, -half, 3.5, true);
+  addTorch(scene, 0, half, 3.5, true);
+  addTorch(scene, -half, 0, 3.5, true);
+  addTorch(scene, half, 0, 3.5, true);
 
   // --- Central safe disc ------------------------------------------------------
   const centralR = 8 + rng() * 6;
@@ -306,7 +315,7 @@ export function buildMap(scene, floor = 1) {
       if (overlap) continue;
 
       addWall(scene, walls, wallMeshes, x, z, w, d, wallHeight, stoneTexture, stoneBump);
-      addTorch(scene, x, z, 3.0);
+      addTorch(scene, x, z, 3.0, false);
       placed = true;
     }
   }
@@ -341,7 +350,7 @@ export function buildMap(scene, floor = 1) {
       if (tooClose) continue;
 
       addPillar(scene, columns, x, z, stoneTexture, stoneBump);
-      if (i % 3 === 0) addTorch(scene, x, z, 3.2);
+      if (i % 3 === 0) addTorch(scene, x, z, 3.2, false);
       placed = true;
     }
   }
