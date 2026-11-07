@@ -118,6 +118,7 @@ function createLevel(scene, floorNumber = 1) {
 const keys = new Set();
 const mouseNDC = { x: 0, y: 0 };
 const ctx = { keys, mouseNDC, camera, arenaSize, mouseDown: false };
+let abilityKeyHeld = false;
 
 const spellings = (event) => [event.code, event.key, event.key.toLowerCase(), event.code.toLowerCase()];
 
@@ -158,11 +159,17 @@ addEventListener('keydown', (event) => {
     const muted = toggleMusic();
     ui.setMusicMuted(muted);
   }
-  if (event.code === 'KeyE') tryTriggerAbility();
+  if (event.code === 'KeyE' && !event.repeat && !abilityKeyHeld) {
+    abilityKeyHeld = true;
+    tryTriggerAbility();
+  }
   if (state === 'gameover' && event.key.toLowerCase() === 'r') restart();
   tryStartMusic();
 });
-addEventListener('keyup', (event) => { for (const token of spellings(event)) keys.delete(token); });
+addEventListener('keyup', (event) => {
+  for (const token of spellings(event)) keys.delete(token);
+  if (event.code === 'KeyE') abilityKeyHeld = false;
+});
 
 addEventListener('mousedown', (event) => {
   if (event.button === 0) {
@@ -174,7 +181,10 @@ addEventListener('mousedown', (event) => {
   }
 });
 addEventListener('mouseup', (event) => { if (event.button === 0) setMouseDown(false); });
-addEventListener('blur', () => setMouseDown(false));
+addEventListener('blur', () => {
+  setMouseDown(false);
+  abilityKeyHeld = false;
+});
 
 addEventListener('pointermove', (event) => {
   mouseNDC.x = (event.clientX / innerWidth) * 2 - 1;
