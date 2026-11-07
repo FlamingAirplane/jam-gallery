@@ -25,7 +25,7 @@ import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElemen
 import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=3';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
-import { buildMap } from './level.js?v=9';
+import { buildMap } from './level.js?v=10';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
 } from './abilities.js?v=4';

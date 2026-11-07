@@ -189,6 +189,23 @@ function addTorch(scene, x, z, y = 3.2, lit = true) {
   scene.add(fixture);
 }
 
+function addCandle(scene, x, z) {
+  // Small static candle: emissive flame, no dynamic light (baked look, cheap).
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.1, 0.35, 8),
+    new THREE.MeshStandardMaterial({ color: '#4a3a2a', roughness: 1 })
+  );
+  base.position.set(x, 0.175, z);
+
+  const flame = new THREE.Mesh(
+    new THREE.SphereGeometry(0.08, 8, 6),
+    new THREE.MeshBasicMaterial({ color: '#ffaa44' })
+  );
+  flame.position.set(x, 0.48, z);
+
+  scene.add(base, flame);
+}
+
 function createCentralDisc(scene, radius = 10) {
   const size = 512;
   const canvas = document.createElement('canvas');
@@ -280,10 +297,26 @@ export function buildMap(scene, floor = 1) {
   addTorch(scene, -half, 0, 3.5, true);
   addTorch(scene, half, 0, 3.5, true);
 
+  // --- Perimeter candles (baked/emissive, no dynamic light) -------------------
+  const candleInset = half - 1.2;
+  const candleSpacing = half / 2.5; // about 16 units apart
+  for (let t = -candleSpacing; t <= candleSpacing; t += candleSpacing) {
+    addCandle(scene, t, candleInset);
+    addCandle(scene, t, -candleInset);
+    addCandle(scene, candleInset, t);
+    addCandle(scene, -candleInset, t);
+  }
+
   // --- Central safe disc ------------------------------------------------------
   const centralR = 8 + rng() * 6;
   createCentralDisc(scene, centralR);
   addTorch(scene, 0, 0, 1.5);
+
+  // Ring of candles around the central safe zone.
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    addCandle(scene, Math.cos(angle) * (centralR + 2), Math.sin(angle) * (centralR + 2));
+  }
 
   // --- Procedural internal walls ----------------------------------------------
   const margin = floorWallMargin;
