@@ -31,12 +31,12 @@ import {
 } from './abilities.js?v=4';
 import {
   createUI, setScore, setFloor, setWave, setHealth, setLevel, setXP,
-  setAbilityCooldown, setBuffs,
+  setAbilityCooldown, setBuffs, setAbilityList,
   showGameOver, hideGameOver,
   showLevelUp, hideLevelUp,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars, getHealthBarCount,
   createSpawnIndicator, positionSpawnIndicator, showBanner,
-} from './ui.js?v=6';
+} from './ui.js?v=7';
 import { initDebug, updateDebug } from './debug.js?v=1';
 
 // --- Overlay -----------------------------------------------------------------
@@ -379,6 +379,7 @@ function restart() {
   player.dead = false;
   player.group.position.set(0, player.group.position.y, 0);
   setElement(player, 'fire');
+  setAbilityList('fire');
   score = 0;
   floor = 1;
   waveInFloor = 1;
@@ -414,6 +415,7 @@ function absorbFields() {
         player.hp = Math.min(maxHp(), player.hp + 10);
       } else {
         setElement(player, field.type);
+        setAbilityList(field.type);
       }
       playAbsorb(field.type);
       field.alive = false;
@@ -844,3 +846,4 @@ setWave(waveInFloor, wavesPerFloor);
 setHealth(player.hp, maxHp());
 setLevel(playerLevel);
 setXP(playerXP, xpToNext);
+setAbilityList('fire');

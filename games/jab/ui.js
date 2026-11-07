@@ -2,7 +2,7 @@
 import {
   enemyHealthBarWidth, enemyHealthBarHeight, enemyHealthBarYOffset,
   enemyHealthBarColor, enemyHealthBarBg,
-  spawnIndicatorSize, spawnIndicatorColor,
+  spawnIndicatorSize, spawnIndicatorColor, elementColors,
 } from './tuning.js';
 
 const GREY = { dark: '#1a1a1a', mid: '#3a3a3a', light: '#5c5c5c', pale: '#999999', white: '#d4d4d4', blood: '#8b0000' };
@@ -28,16 +28,39 @@ export function createUI() {
   });
   const score = document.createElement('div');
   const floor = document.createElement('div');
-  const hp = document.createElement('div');
-  Object.assign(hp.style, { marginTop: '8px', fontSize: '13px', color: GREY.pale });
-  const barOuter = document.createElement('div');
-  Object.assign(barOuter.style, {
-    marginTop: '4px', height: '10px', background: GREY.dark, border: `1px solid ${GREY.mid}`,
+  panel.append(score, floor);
+
+  // Bottom-left health panel.
+  const hpPanel = document.createElement('div');
+  Object.assign(hpPanel.style, {
+    position: 'absolute', left: '16px', bottom: '16px', padding: '10px 14px', minWidth: '170px',
+    background: 'rgba(0,0,0,0.55)', border: `1px solid ${GREY.mid}`, borderRadius: '6px',
   });
-  const bar = document.createElement('div');
-  Object.assign(bar.style, { height: '100%', width: '100%', background: GREY.pale });
-  barOuter.appendChild(bar);
-  panel.append(score, floor, hp, barOuter);
+  const hpText = document.createElement('div');
+  Object.assign(hpText.style, { fontSize: '13px', color: GREY.pale });
+  const hpBarOuter = document.createElement('div');
+  Object.assign(hpBarOuter.style, {
+    marginTop: '4px', height: '12px', background: GREY.dark, border: `1px solid ${GREY.mid}`,
+  });
+  const hpBar = document.createElement('div');
+  Object.assign(hpBar.style, { height: '100%', width: '100%', background: GREY.blood });
+  hpBarOuter.appendChild(hpBar);
+  hpPanel.append(hpText, hpBarOuter);
+  root.appendChild(hpPanel);
+
+  // Bottom ability list.
+  const abilityPanel = document.createElement('div');
+  Object.assign(abilityPanel.style, {
+    position: 'absolute', left: '50%', bottom: '16px', transform: 'translateX(-50%)',
+    padding: '10px 18px', textAlign: 'center',
+    background: 'rgba(0,0,0,0.55)', border: `1px solid ${GREY.mid}`, borderRadius: '6px',
+  });
+  const abilityTitle = document.createElement('div');
+  Object.assign(abilityTitle.style, { fontSize: '14px', fontWeight: 'bold', color: GREY.white });
+  const abilityList = document.createElement('div');
+  Object.assign(abilityList.style, { marginTop: '4px', fontSize: '12px', color: GREY.pale });
+  abilityPanel.append(abilityTitle, abilityList);
+  root.appendChild(abilityPanel);
 
   // Game over: a centred panel with one Restart button. The button is the only clickable thing.
   const over = document.createElement('div');
@@ -157,7 +180,7 @@ export function createUI() {
   levelup.appendChild(levelupBox);
   root.append(levelup);
 
-  els = { score, floor, wave, hp, bar, over, overStats, music, level, xpBar, abilityBar, buffs, banner, bannerTitle, bannerSub, levelup, levelupButtons };
+  els = { score, floor, wave, hpText, hpBar, over, overStats, music, level, xpBar, abilityBar, buffs, abilityTitle, abilityList, banner, bannerTitle, bannerSub, levelup, levelupButtons };
   setScore(0);
   setFloor(1);
   setWave(1, 1);
@@ -208,9 +231,9 @@ export function setWave(current, total) {
 export function setHealth(hp, maxHp) {
   if (!els) return;
   const shown = Math.max(0, Math.ceil(hp));
-  els.hp.textContent = `HP: ${shown} / ${maxHp}`;
-  els.bar.style.width = `${Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0)) * 100}%`;
-  els.bar.style.background = GREY.blood;
+  els.hpText.textContent = `HP: ${shown} / ${maxHp}`;
+  els.hpBar.style.width = `${Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0)) * 100}%`;
+  els.hpBar.style.background = GREY.blood;
 }
 
 export function setLevel(n) {
@@ -237,6 +260,45 @@ export function setBuffs(active) {
     return;
   }
   els.buffs.textContent = 'Buffs: ' + active.map((b) => `${b.label} ${Math.ceil(b.timer)}s`).join(', ');
+}
+
+const ABILITY_COPY = {
+  fire: {
+    title: 'FIRE',
+    lines: [
+      'LMB — Flame blast: single shot, applies burn',
+      'E / RMB — Flame grenade: explodes for AoE burn',
+    ],
+  },
+  water: {
+    title: 'WATER',
+    lines: [
+      'LMB — Piercing beam: passes through enemies',
+      'E / RMB — Tidal wave: wide knockback pulse',
+    ],
+  },
+  earth: {
+    title: 'EARTH',
+    lines: [
+      'LMB — Heavy blast: chance to slow',
+      'E / RMB — Earthquake: expanding slow + knockback',
+    ],
+  },
+  wind: {
+    title: 'WIND',
+    lines: [
+      'LMB — Piercing dart: fast, cuts through enemies',
+      'E / RMB — Gust: narrow knockback stream',
+    ],
+  },
+};
+
+export function setAbilityList(element) {
+  if (!els) return;
+  const copy = ABILITY_COPY[element] ?? ABILITY_COPY.fire;
+  els.abilityTitle.textContent = copy.title;
+  els.abilityTitle.style.color = elementColors[element] ?? GREY.white;
+  els.abilityList.innerHTML = copy.lines.map((l) => `<div>${l}</div>`).join('');
 }
 
 export function showLevelUp(choices, onChoose) {
