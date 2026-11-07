@@ -89,6 +89,7 @@ export const wallThickness = 1.5;
 export const internalWallCount = 4;
 export const internalWallLength = 18;
 export const internalWallThickness = 1.8;
+export const floorWallMargin = 8;      // keep this much space clear around the outer walls
 
 // Elements
 export const elementTypes = ['fire', 'water', 'earth', 'wind'];

@@ -97,9 +97,25 @@ export function playDeath() {
 
 export function playAbsorb(element = 'fire') {
   if (!audioCtx) ensureContext();
-  const freq = element === 'earth' ? 220 : element === 'water' ? 520 : 880;
+  const freq = element === 'earth' ? 220 : element === 'water' ? 520 : element === 'wind' ? 700 : 880;
   playTone({ type: 'sine', startFreq: freq * 0.6, endFreq: freq, duration: 0.25, volume: 0.12, attack: 0.02 });
   playNoise({ duration: 0.2, volume: 0.08, filterFreq: freq * 2, filterType: 'bandpass', attack: 0.02 });
+}
+
+export function playLevelUp() {
+  if (!audioCtx) ensureContext();
+  playTone({ type: 'triangle', startFreq: 440, endFreq: 880, duration: 0.25, volume: 0.14, attack: 0.02 });
+  setTimeout(() => playTone({ type: 'triangle', startFreq: 880, endFreq: 1760, duration: 0.35, volume: 0.12, attack: 0.02 }), 120);
+}
+
+export function playAchievement() {
+  if (!audioCtx) ensureContext();
+  playTone({ type: 'sine', startFreq: 523, endFreq: 1046, duration: 0.3, volume: 0.12, attack: 0.02 });
+}
+
+export function playItemPickup() {
+  if (!audioCtx) ensureContext();
+  playTone({ type: 'sine', startFreq: 660, endFreq: 990, duration: 0.18, volume: 0.1, attack: 0.01 });
 }
 
 export function resumeAudio() {

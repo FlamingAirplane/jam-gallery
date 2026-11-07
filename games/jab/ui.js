@@ -98,6 +98,23 @@ export function createUI() {
   xpOuter.appendChild(xpBar);
   panel.append(xpOuter);
 
+  const abilityLabel = document.createElement('div');
+  Object.assign(abilityLabel.style, { marginTop: '6px', fontSize: '12px', color: GREY.light });
+  abilityLabel.textContent = 'Alt-fire (E / RMB)';
+  panel.append(abilityLabel);
+  const abilityOuter = document.createElement('div');
+  Object.assign(abilityOuter.style, {
+    marginTop: '2px', height: '6px', background: GREY.dark, border: `1px solid ${GREY.mid}`,
+  });
+  const abilityBar = document.createElement('div');
+  Object.assign(abilityBar.style, { height: '100%', width: '100%', background: '#3498db' });
+  abilityOuter.appendChild(abilityBar);
+  panel.append(abilityOuter);
+
+  const buffs = document.createElement('div');
+  Object.assign(buffs.style, { marginTop: '6px', fontSize: '12px', color: GREY.pale, minHeight: '18px' });
+  panel.append(buffs);
+
   // Centre banner for floor start / complete announcements.
   const banner = document.createElement('div');
   Object.assign(banner.style, {
@@ -140,7 +157,7 @@ export function createUI() {
   levelup.appendChild(levelupBox);
   root.append(levelup);
 
-  els = { score, floor, wave, hp, bar, over, overStats, music, level, xpBar, banner, bannerTitle, bannerSub, levelup, levelupButtons };
+  els = { score, floor, wave, hp, bar, over, overStats, music, level, xpBar, abilityBar, buffs, banner, bannerTitle, bannerSub, levelup, levelupButtons };
   setScore(0);
   setFloor(1);
   setWave(1, 1);
@@ -204,6 +221,21 @@ export function setXP(xp, xpToNext) {
   if (!els) return;
   const ratio = Math.max(0, Math.min(1, xpToNext > 0 ? xp / xpToNext : 0));
   els.xpBar.style.width = `${ratio * 100}%`;
+}
+
+export function setAbilityCooldown(remaining, total) {
+  if (!els) return;
+  const ratio = total > 0 ? Math.max(0, Math.min(1, 1 - remaining / total)) : 1;
+  els.abilityBar.style.width = `${ratio * 100}%`;
+}
+
+export function setBuffs(active) {
+  if (!els) return;
+  if (active.length === 0) {
+    els.buffs.textContent = '';
+    return;
+  }
+  els.buffs.textContent = 'Buffs: ' + active.map((b) => `${b.label} ${Math.ceil(b.timer)}s`).join(', ');
 }
 
 export function showLevelUp(choices, onChoose) {

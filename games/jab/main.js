@@ -13,7 +13,7 @@ import {
   archerProjectileRadius, archerProjectileDamage,
   burnDuration, earthSlowChance, earthSlowDuration,
   xpBase, xpGrowth, xpValues, levelUpChoices, upgradeOptions,
-  itemDropChance, itemDuration,
+  itemDropChance, itemDuration, abilityCooldown,
 } from './tuning.js';
 import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=11';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
@@ -24,17 +24,19 @@ import {
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=2';
 import { spawnItemAt, updateItems, clearItems, itemTypeFor } from './items.js?v=1';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
-import { playHit, playDeath, playAbsorb, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=3';
-import { buildMap } from './level.js?v=4';
+import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
+import { buildMap } from './level.js?v=5';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns,
 } from './abilities.js?v=3';
 import {
-  createUI, setScore, setFloor, setWave, setHealth, setLevel, setXP, showGameOver, hideGameOver,
+  createUI, setScore, setFloor, setWave, setHealth, setLevel, setXP,
+  setAbilityCooldown, setBuffs,
+  showGameOver, hideGameOver,
   showLevelUp, hideLevelUp,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
   createSpawnIndicator, positionSpawnIndicator, showBanner,
-} from './ui.js?v=4';
+} from './ui.js?v=5';
 
 // --- Overlay -----------------------------------------------------------------
 const ui = createUI();
@@ -83,9 +85,6 @@ new THREE.TextureLoader().load('assets/L_Floor.png?v=1', (texture) => {
   floorMesh.material.needsUpdate = true;
 });
 
-const grid = new THREE.GridHelper(arenaSize * 2, arenaSize, '#7a4a35', '#5c3a2a');
-grid.position.y = 0.02;
-scene.add(grid);
 
 // --- Level layout (inspired by Map_Base.png) ---------------------------------
 let walls = [];
@@ -482,10 +481,12 @@ function applyNewAchievements() {
       player.hp = maxHp() * Math.max(0.1, ratio);
     }
     showBanner(`Achievement: ${ach.label}`, ach.desc, 2500);
+    playAchievement();
   }
 }
 
 function applyItem(type) {
+  playItemPickup();
   if (type.key === 'heal') {
     player.hp = Math.min(maxHp(), player.hp + maxHp() * 0.3);
   } else {
@@ -529,6 +530,7 @@ function levelUp() {
     }
     state = 'playing';
     hideLevelUp();
+    playLevelUp();
     setHealth(player.hp, maxHp());
   });
 }
@@ -695,6 +697,18 @@ function update(dt) {
       player.buffs[key] = 1;
     }
   }
+
+  // HUD: ability cooldown and active item buffs.
+  const cds = getCooldowns();
+  setAbilityCooldown(cds[player.element], abilityCooldown[player.element]);
+  const activeBuffList = [];
+  const buffLabels = { damage: 'Might', speed: 'Swiftness', fireRate: 'Alacrity' };
+  for (const key of Object.keys(itemBuffs)) {
+    if (itemBuffs[key].timer > 0) {
+      activeBuffList.push({ label: buffLabels[key], timer: itemBuffs[key].timer });
+    }
+  }
+  setBuffs(activeBuffList);
 
   // Alternate-fire abilities.
   const abilityEvents = updateAbilities(dt, getEnemies(), scene);

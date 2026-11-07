@@ -1,7 +1,10 @@
 // level.js — a designed dungeon layout inspired by Map_Base.png.
 // No image is copied; the layout is rebuilt from simple shapes.
 import * as THREE from 'three';
-import { arenaSize, wallHeight, columnRadius } from './tuning.js';
+import {
+  arenaSize, wallHeight, columnRadius, columnMinDistanceFromPlayer,
+  internalWallCount, internalWallLength, internalWallThickness, floorWallMargin,
+} from './tuning.js';
 
 const STONE_COLOR = '#8e8e8e';
 
@@ -215,14 +218,27 @@ function createCentralDisc(scene, radius = 10) {
   scene.add(mesh);
 }
 
-function getLayout(floor) {
-  // Three preset dungeon arrangements that cycle every floor.
-  const presets = [
-    { roomCenter: 28, roomSize: 18, corridorW: 8, centralR: 10, name: 'cross' },
-    { roomCenter: 26, roomSize: 22, corridorW: 12, centralR: 12, name: 'wide halls' },
-    { roomCenter: 30, roomSize: 16, corridorW: 5, centralR: 8, name: 'tight keep' },
-  ];
-  return presets[(floor - 1) % presets.length];
+function seededRandom(seed) {
+  // Simple LCG so each floor number produces the same layout every run.
+  let s = (seed >>> 0) || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function rectRectOverlap(ax, az, aw, ad, bx, bz, bw, bd, gap = 0) {
+  return (
+    Math.abs(ax - bx) < (aw + bw) / 2 + gap &&
+    Math.abs(az - bz) < (ad + bd) / 2 + gap
+  );
+}
+
+function rectCircleDistance(rx, rz, rw, rd, cx, cz) {
+  // Distance from circle centre to the closest point inside the rectangle.
+  const dx = Math.max(Math.abs(cx - rx) - rw / 2, 0);
+  const dz = Math.max(Math.abs(cz - rz) - rd / 2, 0);
+  return Math.hypot(dx, dz);
 }
 
 export function buildMap(scene, floor = 1) {
@@ -231,96 +247,92 @@ export function buildMap(scene, floor = 1) {
   const columns = [];
 
   const half = arenaSize;
-  const wallH = wallHeight;
   const thickness = 2.2;
-  const layout = getLayout(floor);
-  const roomCenter = layout.roomCenter;
-  const roomSize = layout.roomSize;
-  const corridorW = layout.corridorW;
-  const centralR = layout.centralR;
+  const rng = seededRandom(floor * 12345 + 6789);
 
   // --- Perimeter walls with crenellations ------------------------------------
-  const perimeterH = wallH;
   const outerLong = half * 2 + thickness;
-  addWall(scene, walls, wallMeshes, 0, -half - thickness / 2, outerLong, thickness, perimeterH, stoneTexture, stoneBump);
-  addWall(scene, walls, wallMeshes, 0, half + thickness / 2, outerLong, thickness, perimeterH, stoneTexture, stoneBump);
-  addWall(scene, walls, wallMeshes, -half - thickness / 2, 0, thickness, outerLong, perimeterH, stoneTexture, stoneBump);
-  addWall(scene, walls, wallMeshes, half + thickness / 2, 0, thickness, outerLong, perimeterH, stoneTexture, stoneBump);
+  addWall(scene, walls, wallMeshes, 0, -half - thickness / 2, outerLong, thickness, wallHeight, stoneTexture, stoneBump);
+  addWall(scene, walls, wallMeshes, 0, half + thickness / 2, outerLong, thickness, wallHeight, stoneTexture, stoneBump);
+  addWall(scene, walls, wallMeshes, -half - thickness / 2, 0, thickness, outerLong, wallHeight, stoneTexture, stoneBump);
+  addWall(scene, walls, wallMeshes, half + thickness / 2, 0, thickness, outerLong, wallHeight, stoneTexture, stoneBump);
   addCrenellations(scene, 0, -half - thickness / 2, outerLong, thickness, stoneTexture, stoneBump);
   addCrenellations(scene, 0, half + thickness / 2, outerLong, thickness, stoneTexture, stoneBump);
   addCrenellations(scene, -half - thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
   addCrenellations(scene, half + thickness / 2, 0, thickness, outerLong, stoneTexture, stoneBump);
 
-  // --- Corner rooms ----------------------------------------------------------
-  const roomOffsets = [
-    { x: roomCenter, z: roomCenter },
-    { x: -roomCenter, z: roomCenter },
-    { x: roomCenter, z: -roomCenter },
-    { x: -roomCenter, z: -roomCenter },
-  ];
-  for (const off of roomOffsets) {
-    const rx = off.x;
-    const rz = off.z;
-    const sx = Math.sign(rx);
-    const sz = Math.sign(rz);
-    // Outer walls.
-    addWall(scene, walls, wallMeshes, rx + sx * roomSize / 2, rz, thickness, roomSize, wallH, stoneTexture, stoneBump);
-    addWall(scene, walls, wallMeshes, rx, rz + sz * roomSize / 2, roomSize, thickness, wallH, stoneTexture, stoneBump);
-    // Inner-side walls with doorway gap.
-    const doorHalf = corridorW / 2 + thickness;
-    const sideLen = (roomSize - corridorW) / 2 - thickness;
-    // left of door
-    addWall(scene, walls, wallMeshes, rx - sx * (roomSize / 2 - sideLen / 2), rz - sz * (corridorW / 2 + sideLen / 2), sideLen, thickness, wallH, stoneTexture, stoneBump);
-    // right of door
-    addWall(scene, walls, wallMeshes, rx + sx * (roomSize / 2 - sideLen / 2), rz - sz * (corridorW / 2 + sideLen / 2), sideLen, thickness, wallH, stoneTexture, stoneBump);
-
-    // Corner pillars.
-    addPillar(scene, columns, rx + sx * (roomSize / 2 - 1.5), rz + sz * (roomSize / 2 - 1.5), stoneTexture, stoneBump);
-    addPillar(scene, columns, rx - sx * (roomSize / 2 - 1.5), rz + sz * (roomSize / 2 - 1.5), stoneTexture, stoneBump);
-    addPillar(scene, columns, rx + sx * (roomSize / 2 - 1.5), rz - sz * (roomSize / 2 - 1.5), stoneTexture, stoneBump);
-
-    // Torches inside rooms.
-    addTorch(scene, rx - sx * 4, rz - sz * 4, 3);
-  }
-
-  // --- Corridors and central chamber -----------------------------------------
-  // Four corridor side walls, stopping before the central disc.
-  const corridorStart = centralR + thickness / 2;
-  const corridorEnd = roomCenter - roomSize / 2 - thickness / 2;
-  const corridorLen = corridorEnd - corridorStart;
-  const offsets = [
-    { x: corridorW / 2 + thickness / 2, z: 0, rot: 0, dx: 0, dz: 1 },
-    { x: -(corridorW / 2 + thickness / 2), z: 0, rot: 0, dx: 0, dz: 1 },
-    { x: 0, z: corridorW / 2 + thickness / 2, rot: Math.PI / 2, dx: 1, dz: 0 },
-    { x: 0, z: -(corridorW / 2 + thickness / 2), rot: Math.PI / 2, dx: 1, dz: 0 },
-  ];
-  for (const off of offsets) {
-    const mid = (corridorStart + corridorEnd) / 2;
-    if (off.rot === 0) {
-      addWall(scene, walls, wallMeshes, off.x, mid, thickness, corridorLen, wallH, stoneTexture, stoneBump);
-    } else {
-      addWall(scene, walls, wallMeshes, mid, off.z, corridorLen, thickness, wallH, stoneTexture, stoneBump);
-    }
-    // Arch at the corridor/central chamber boundary.
-    const ax = off.dx * corridorStart + off.x * (1 - Math.abs(off.dx));
-    const az = off.dz * corridorStart + off.z * (1 - Math.abs(off.dz));
-    addArch(scene, ax, az, corridorW, thickness, off.rot, stoneTexture, stoneBump);
-    // Pillars flanking the arch.
-    const px = ax + off.dx * 1.5 + (off.dz ? corridorW / 2 : 0) * Math.sign(off.x || off.z);
-    // simpler pillar placement along corridor edges
-    addPillar(scene, columns, off.x > 0 ? off.x : off.x, off.z > 0 ? corridorStart + 2 : corridorEnd - 2, stoneTexture, stoneBump);
-    addPillar(scene, columns, off.x > 0 ? off.x : off.x, off.z < 0 ? -(corridorStart + 2) : corridorEnd - 2, stoneTexture, stoneBump);
-  }
-
-  // --- Central disc/fountain --------------------------------------------------
+  // --- Central safe disc ------------------------------------------------------
+  const centralR = 8 + rng() * 6;
   createCentralDisc(scene, centralR);
   addTorch(scene, 0, 0, 1.5);
 
-  // --- Extra pillars around the central chamber -------------------------------
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2 + Math.PI / 8;
-    const r = centralR + 3.5;
-    addPillar(scene, columns, Math.cos(angle) * r, Math.sin(angle) * r, stoneTexture, stoneBump);
+  // --- Procedural internal walls ----------------------------------------------
+  const margin = floorWallMargin;
+  const safeR = columnMinDistanceFromPlayer;
+  const minGap = 4;
+  const wallCount = Math.max(2, internalWallCount + Math.floor((floor - 1) / 2));
+
+  for (let i = 0; i < wallCount; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 30 && !placed; attempt++) {
+      const horizontal = rng() < 0.5;
+      const len = 6 + rng() * (internalWallLength - 6);
+      const w = horizontal ? len : internalWallThickness;
+      const d = horizontal ? internalWallThickness : len;
+      const x = (rng() * 2 - 1) * (half - margin - Math.max(w, d) / 2);
+      const z = (rng() * 2 - 1) * (half - margin - Math.max(w, d) / 2);
+
+      // Keep the player spawn and a ring around it completely open.
+      if (rectCircleDistance(x, z, w, d, 0, 0) < safeR) continue;
+
+      // Keep walls away from each other and from the perimeter (perimeter is outside margin, so this is automatic).
+      let overlap = false;
+      for (const wall of walls) {
+        if (rectRectOverlap(x, z, w, d, wall.x, wall.z, wall.halfW * 2, wall.halfD * 2, minGap)) {
+          overlap = true;
+          break;
+        }
+      }
+      if (overlap) continue;
+
+      addWall(scene, walls, wallMeshes, x, z, w, d, wallHeight, stoneTexture, stoneBump);
+      placed = true;
+    }
+  }
+
+  // --- Procedural columns/pillars ---------------------------------------------
+  const colCount = Math.min(20, columnCount + Math.floor((floor - 1) / 2));
+  for (let i = 0; i < colCount; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 30 && !placed; attempt++) {
+      const x = (rng() * 2 - 1) * (half - margin - columnRadius);
+      const z = (rng() * 2 - 1) * (half - margin - columnRadius);
+
+      if (Math.hypot(x, z) < safeR + columnRadius) continue;
+
+      let tooClose = false;
+      for (const wall of walls) {
+        if (rectCircleDistance(wall.x, wall.z, wall.halfW * 2, wall.halfD * 2, x, z) < columnRadius + minGap) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
+
+      for (const col of columns) {
+        const dx = col.position.x - x;
+        const dz = col.position.z - z;
+        if (Math.hypot(dx, dz) < columnRadius * 2 + minGap) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
+
+      addPillar(scene, columns, x, z, stoneTexture, stoneBump);
+      if (i % 3 === 0) addTorch(scene, x, z, 3.2);
+      placed = true;
+    }
   }
 
   return { walls, wallMeshes, columns };
