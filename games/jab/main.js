@@ -22,7 +22,7 @@ import {
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=7';
 import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=6';
-import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=4';
+import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=5';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=5';
 import { buildMap, createLightmapTexture } from './level.js?v=12';

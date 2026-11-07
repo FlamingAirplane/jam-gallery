@@ -3,6 +3,13 @@ import * as THREE from 'three';
 
 const items = [];
 
+export const ITEM_TYPES = [
+  { key: 'damage', label: 'Might', color: '#e74c3c', mul: 1.25 },
+  { key: 'speed', label: 'Swiftness', color: '#3498db', mul: 1.25 },
+  { key: 'fireRate', label: 'Alacrity', color: '#f1c40f', mul: 1.25 },
+  { key: 'heal', label: 'Restoration', color: '#2ecc71', mul: 0 },
+];
+
 // Shared geometry and per-type materials so pickups don't allocate on every drop.
 const itemGeometry = new THREE.OctahedronGeometry(0.45, 0);
 const ringGeometry = new THREE.RingGeometry(0.35, 0.5, 16);
@@ -18,13 +25,6 @@ for (const type of ITEM_TYPES) {
   });
   ringMaterials[type.key] = new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
 }
-
-export const ITEM_TYPES = [
-  { key: 'damage', label: 'Might', color: '#e74c3c', mul: 1.25 },
-  { key: 'speed', label: 'Swiftness', color: '#3498db', mul: 1.25 },
-  { key: 'fireRate', label: 'Alacrity', color: '#f1c40f', mul: 1.25 },
-  { key: 'heal', label: 'Restoration', color: '#2ecc71', mul: 0 },
-];
 
 export function itemTypeFor(key) {
   return ITEM_TYPES.find((t) => t.key === key) ?? ITEM_TYPES[0];
