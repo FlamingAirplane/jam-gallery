@@ -6,7 +6,7 @@ import {
   internalWallCount, internalWallLength, internalWallThickness, floorWallMargin,
 } from './tuning.js';
 
-const STONE_COLOR = '#8e8e8e';
+const STONE_COLOR = '#3a3a3a';
 
 function createStoneTexture() {
   const size = 512;
@@ -14,12 +14,12 @@ function createStoneTexture() {
   canvas.width = size;
   canvas.height = size;
   const c = canvas.getContext('2d');
-  c.fillStyle = '#5c5c5c';
+  c.fillStyle = '#2a2a2a';
   c.fillRect(0, 0, size, size);
   for (let i = 0; i < 60000; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
-    const shade = Math.random() < 0.5 ? '#666666' : '#525252';
+    const shade = Math.random() < 0.5 ? '#333333' : '#252525';
     c.fillStyle = shade;
     c.fillRect(x, y, 2, 2);
   }
@@ -190,14 +190,14 @@ function createCentralDisc(scene, radius = 10) {
   const c = canvas.getContext('2d');
   const cx = size / 2;
   // Cobalt pool with mosaic border.
-  c.fillStyle = '#1a2332';
+  c.fillStyle = '#0d0d0d';
   c.fillRect(0, 0, size, size);
   c.beginPath();
   c.arc(cx, cx, cx - 8, 0, Math.PI * 2);
-  c.fillStyle = '#2a4d6e';
+  c.fillStyle = '#15202e';
   c.fill();
   c.lineWidth = 12;
-  c.strokeStyle = '#8c8c8c';
+  c.strokeStyle = '#3a3a3a';
   c.stroke();
   // decorative rings
   for (let r = cx * 0.25; r < cx - 20; r += 30) {

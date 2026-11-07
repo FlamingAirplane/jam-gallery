@@ -5,7 +5,7 @@ import {
   spawnIndicatorSize, spawnIndicatorColor,
 } from './tuning.js';
 
-const GREY = { dark: '#595959', mid: '#7f7f7f', light: '#a5a5a5', pale: '#cccccc', white: '#f2f2f2' };
+const GREY = { dark: '#1a1a1a', mid: '#3a3a3a', light: '#5c5c5c', pale: '#999999', white: '#d4d4d4', blood: '#8b0000' };
 
 let els = null;            // built by createUI
 let onRestart = null;      // set by main.js
@@ -47,8 +47,8 @@ export function createUI() {
   });
   const box = document.createElement('div');
   Object.assign(box.style, {
-    padding: '24px 32px', textAlign: 'center', background: 'rgba(0,0,0,0.75)',
-    border: `1px solid ${GREY.light}`, borderRadius: '8px',
+    padding: '24px 32px', textAlign: 'center', background: 'rgba(0,0,0,0.8)',
+    border: `1px solid ${GREY.blood}`, borderRadius: '8px',
   });
   const title = document.createElement('div');
   title.textContent = 'The golem is destroyed';
@@ -123,8 +123,8 @@ export function createUI() {
   });
   const bannerBox = document.createElement('div');
   Object.assign(bannerBox.style, {
-    padding: '18px 40px', textAlign: 'center', background: 'rgba(0,0,0,0.7)',
-    border: `2px solid ${GREY.light}`, borderRadius: '10px',
+    padding: '18px 40px', textAlign: 'center', background: 'rgba(0,0,0,0.8)',
+    border: `2px solid ${GREY.blood}`, borderRadius: '10px',
   });
   const bannerTitle = document.createElement('div');
   Object.assign(bannerTitle.style, { fontSize: '32px', fontWeight: 'bold', letterSpacing: '1px' });
@@ -210,6 +210,7 @@ export function setHealth(hp, maxHp) {
   const shown = Math.max(0, Math.ceil(hp));
   els.hp.textContent = `HP: ${shown} / ${maxHp}`;
   els.bar.style.width = `${Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0)) * 100}%`;
+  els.bar.style.background = GREY.blood;
 }
 
 export function setLevel(n) {

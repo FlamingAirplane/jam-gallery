@@ -25,7 +25,7 @@ import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElemen
 import { spawnItemAt, updateItems, clearItems, itemTypeFor } from './items.js?v=1';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
-import { buildMap } from './level.js?v=6';
+import { buildMap } from './level.js?v=7';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns,
 } from './abilities.js?v=3';
@@ -36,14 +36,15 @@ import {
   showLevelUp, hideLevelUp,
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars,
   createSpawnIndicator, positionSpawnIndicator, showBanner,
-} from './ui.js?v=5';
+} from './ui.js?v=6';
 
 // --- Overlay -----------------------------------------------------------------
 const ui = createUI();
 
 // --- Scene, camera, renderer -------------------------------------------------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#595959');
+scene.background = new THREE.Color('#0a0a0a');
+scene.fog = new THREE.FogExp2('#0a0a0a', 0.016);
 
 // Isometric-ish top-down: 45 degrees around the golem, zoomed in, aimed at the golem.
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
@@ -59,8 +60,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight('#f2f2f2', '#595959', 1.6));
-const sun = new THREE.DirectionalLight('#f2f2f2', 1.8);
+scene.add(new THREE.HemisphereLight('#555555', '#111111', 1.0));
+const sun = new THREE.DirectionalLight('#6a7a8a', 1.2);
 sun.position.set(8, 16, 6);
 scene.add(sun);
 
@@ -69,7 +70,7 @@ scene.add(sun);
 // for the first frame while the texture loads.
 const floorMesh = new THREE.Mesh(
   new THREE.PlaneGeometry(arenaSize * 2, arenaSize * 2),
-  new THREE.MeshStandardMaterial({ color: '#6e6e6e', roughness: 0.9 })
+  new THREE.MeshStandardMaterial({ color: '#2a2a2a', roughness: 0.95 })
 );
 floorMesh.rotation.x = -Math.PI / 2;
 scene.add(floorMesh);
@@ -81,7 +82,7 @@ new THREE.TextureLoader().load('assets/L_Floor.png?v=1', (texture) => {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   floorMesh.material.map = texture;
-  floorMesh.material.color.setHex(0xffffff);
+  floorMesh.material.color.set('#3a3a3a');
   floorMesh.material.needsUpdate = true;
 });
 
