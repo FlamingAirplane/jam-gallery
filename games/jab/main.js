@@ -15,7 +15,7 @@ import {
   xpBase, xpGrowth, xpValues, levelUpChoices, upgradeOptions,
   itemDropChance, itemDuration, abilityCooldown,
 } from './tuning.js?v=1';
-import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=12';
+import { createPlayer, updatePlayer, updateProjectiles, getProjectiles, setElement, getElement, applyWaterSpeedBoost } from './player.js?v=13';
 import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,

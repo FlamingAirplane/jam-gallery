@@ -28,6 +28,7 @@ import {
 } from './tuning.js?v=1';
 import { spawnMuzzleFlash, spawnProjectileTrailDot, clearFX } from './fx.js?v=2';
 import { playShoot } from './audio.js?v=2';
+import { createFireball, updateFireball, removeFireball } from './fireball.js?v=1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const GOLEM_COLOR = '#8e9196';
@@ -273,10 +274,13 @@ export function updateProjectiles(dt) {
     shot.mesh.position.addScaledVector(shot.dir, step);
     shot.traveled += step;
 
+    if (shot.fireball) updateFireball(shot.fireball, dt);
+
     shot.trailTimer += dt;
     if (shot.trailTimer >= trailSpawnInterval) {
       shot.trailTimer = 0;
-      spawnProjectileTrailDot(shotScene, shot.mesh.position.clone(), shot.mesh.material.color);
+      const color = shot.mesh.material.color || new THREE.Color(elementColors[shot.element] || PROJECTILE_COLOR);
+      spawnProjectileTrailDot(shotScene, shot.mesh.position.clone(), color);
     }
 
     if (shot.traveled >= projectileRange) shot.alive = false; // cleaned up next frame
@@ -297,6 +301,7 @@ function spawnShot(player) {
   let speed = projectileSpeed;
   let damage = projectileDamage * player.upgrades.damage * player.buffs.damage;
   let pierce;
+  let fireball = null;
 
   if (element === 'water') {
     // Thinner, longer piercing beam.
@@ -317,8 +322,10 @@ function spawnShot(player) {
     speed = windProjectileSpeed;
     pierce = windPierceCount;
   } else {
-    // Fire: fast default bolt.
-    mesh = new THREE.Mesh(projectileGeometry, material);
+    // Fire: looping sprite-sheet fireball.
+    fireball = createFireball(shotScene, 1.4);
+    mesh = fireball.sprite;
+    mesh.material.color = new THREE.Color(elementColors.fire);
     speed = fireProjectileSpeed;
   }
 
@@ -340,6 +347,8 @@ function spawnShot(player) {
     speed,
     pierce,
     trailTimer: 0,
+    element,
+    fireball: element === 'fire' ? fireball : undefined,
   });
 }
 
