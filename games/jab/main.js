@@ -58,7 +58,7 @@ camera.position.set(
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
@@ -548,7 +548,7 @@ function damageEnemy(enemy, damage) {
   if (!alive(enemy)) return;
   enemy.hp -= damage;
   ensureHealthBar(enemy);
-  enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
+  if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
   if (enemy.hp <= 0) {
     killEnemy(enemy, enemy.mesh.position.clone());
   }
@@ -564,7 +564,7 @@ function hitEnemies() {
       if (distanceXZ(shot.mesh.position, enemy.mesh.position) < reach) {
         enemy.hp -= shot.damage ?? projectileDamage;
         ensureHealthBar(enemy);
-        enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
+        if (enemy.healthBar) enemy.healthBar.setHp(enemy.hp, enemy.maxHp ?? enemyHP);
 
         // Elemental status effects.
         if (player.element === 'fire') enemy.burnTimer = burnDuration;
