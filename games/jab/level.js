@@ -169,13 +169,13 @@ function addPillar(scene, columns, x, z, texture, bump) {
   columns.push(group);
 }
 
-const MAX_DYNAMIC_TORCHES = 4;
+const MAX_DYNAMIC_TORCHES = 8;
 let dynamicTorchCount = 0;
 
 function addTorch(scene, x, z, y = 3.2, lit = true) {
   // Only the first few torches cast real point light; the rest are emissive fakes.
   if (lit && dynamicTorchCount < MAX_DYNAMIC_TORCHES) {
-    const light = new THREE.PointLight('#ffaa44', 3, 14);
+    const light = new THREE.PointLight('#ffaa44', 5, 18);
     light.position.set(x, y, z);
     scene.add(light);
     dynamicTorchCount += 1;

@@ -20,12 +20,12 @@ import { spawnHitBurst, updateFX, clearFX } from './fx.js?v=2';
 import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
-} from './enemies.js?v=6';
-import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=4';
+} from './enemies.js?v=7';
+import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=5';
 import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=3';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
 import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
-import { buildMap } from './level.js?v=10';
+import { buildMap } from './level.js?v=11';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
 } from './abilities.js?v=4';
@@ -46,7 +46,7 @@ initDebug();
 // --- Scene, camera, renderer -------------------------------------------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0a0a0a');
-scene.fog = new THREE.FogExp2('#0a0a0a', 0.016);
+scene.fog = new THREE.FogExp2('#0a0a0a', 0.011);
 
 // Isometric-ish top-down: 45 degrees around the golem, zoomed in, aimed at the golem.
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
@@ -62,13 +62,13 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight('#555555', '#111111', 1.3));
-const sun = new THREE.DirectionalLight('#7a8a9a', 1.4);
+scene.add(new THREE.HemisphereLight('#666666', '#151515', 1.8));
+const sun = new THREE.DirectionalLight('#8a9aaa', 2.0);
 sun.position.set(8, 16, 6);
 scene.add(sun);
 
 // Soft cool fill from the opposite side so shadows aren't pure black.
-const fill = new THREE.DirectionalLight('#3a4a5a', 0.5);
+const fill = new THREE.DirectionalLight('#4a5a6a', 0.8);
 fill.position.set(-8, 8, -6);
 scene.add(fill);
 

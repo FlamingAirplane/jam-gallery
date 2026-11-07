@@ -15,6 +15,7 @@ import {
   leaderAuraRadius, leaderSpeedMul, heroHpMul, heroSpeedMul, cowardFleeHpRatio,
   burnDamagePerSecond, burnDuration,
   earthSlowMul, earthSlowDuration,
+  elementColors,
 } from './tuning.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -121,10 +122,17 @@ function getHealerGeometry() {
   return healerGeometry;
 }
 
+function pickElement(role) {
+  // Each enemy has one element; ranged roles use water assets, brawlers use fire/earth.
+  if (role === 'archer' || role === 'mage' || role === 'healer') return 'water';
+  return Math.random() < 0.5 ? 'fire' : 'earth';
+}
+
 export function spawnEnemyAt(scene, position, role = null) {
   shotScene = scene;
   const chosenRole = role ?? pickRole();
   const personality = pickPersonality();
+  const element = pickElement(chosenRole);
   let mesh;
   let scale = 1;
   if (chosenRole === 'archer') {
@@ -191,6 +199,7 @@ export function spawnEnemyAt(scene, position, role = null) {
     radius: enemyRadius * scale,
     role: chosenRole,
     personality,
+    element,
     fireTimer: Math.random() * 0.8,
     healTimer: Math.random() * (1 / healerHealRate),
     burnTimer: 0,
@@ -240,13 +249,13 @@ function spawnEnemyProjectile(position, direction, {
   });
 }
 
-function spawnMageProjectile(position, direction) {
+function spawnMageProjectile(position, direction, color = '#9b59b6') {
   spawnEnemyProjectile(position, direction, {
     speed: mageProjectileSpeed,
     damage: mageProjectileDamage,
     radius: mageProjectileRadius,
     range: mageProjectileRange,
-    color: '#9b59b6',
+    color,
   });
 }
 
@@ -420,10 +429,11 @@ export function updateEnemies(dt, targetPos) {
         if (!fleeing && !cowardHiding && enemy.scatterTimer <= 0 && enemy.fireTimer <= 0 && distance < prefRange + rangeTol * 2 && distance > 1) {
           const origin = position.clone().add(new THREE.Vector3(0, enemyRadius, 0));
           const dir = new THREE.Vector3(dx / distance, 0, dz / distance);
+          const projectileColor = elementColors[enemy.element] ?? '#f2a65a';
           if (isMage) {
-            spawnMageProjectile(origin, dir);
+            spawnMageProjectile(origin, dir, projectileColor);
           } else {
-            spawnEnemyProjectile(origin, dir);
+            spawnEnemyProjectile(origin, dir, { color: projectileColor });
           }
           enemy.fireTimer = 1 / fireRate + Math.random() * 0.2;
         }
