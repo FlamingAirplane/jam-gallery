@@ -3,6 +3,22 @@ import * as THREE from 'three';
 
 const items = [];
 
+// Shared geometry and per-type materials so pickups don't allocate on every drop.
+const itemGeometry = new THREE.OctahedronGeometry(0.45, 0);
+const ringGeometry = new THREE.RingGeometry(0.35, 0.5, 16);
+const itemMaterials = {};
+const ringMaterials = {};
+for (const type of ITEM_TYPES) {
+  itemMaterials[type.key] = new THREE.MeshStandardMaterial({
+    color: type.color,
+    emissive: type.color,
+    emissiveIntensity: 0.4,
+    roughness: 0.3,
+    metalness: 0.6,
+  });
+  ringMaterials[type.key] = new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+}
+
 export const ITEM_TYPES = [
   { key: 'damage', label: 'Might', color: '#e74c3c', mul: 1.25 },
   { key: 'speed', label: 'Swiftness', color: '#3498db', mul: 1.25 },
@@ -16,23 +32,12 @@ export function itemTypeFor(key) {
 
 function createItemMesh(scene, type, x, z) {
   const group = new THREE.Group();
-  const geo = new THREE.OctahedronGeometry(0.45, 0);
-  const mat = new THREE.MeshStandardMaterial({
-    color: type.color,
-    emissive: type.color,
-    emissiveIntensity: 0.4,
-    roughness: 0.3,
-    metalness: 0.6,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
+  const mesh = new THREE.Mesh(itemGeometry, itemMaterials[type.key]);
   mesh.position.y = 0.7;
   group.add(mesh);
 
   // Small ground ring.
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.35, 0.5, 16),
-    new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
-  );
+  const ring = new THREE.Mesh(ringGeometry, ringMaterials[type.key]);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.04;
   group.add(ring);

@@ -21,10 +21,10 @@ import {
   spawnEnemyAt, updateEnemies, getEnemies, clearEnemies,
   updateEnemyProjectiles, getEnemyProjectiles, clearEnemyProjectiles,
 } from './enemies.js?v=7';
-import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=5';
-import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=3';
+import { spawnElementFields, spawnElementFieldAt, updateElementFields, getElementFields, clearElementFields } from './elements.js?v=6';
+import { spawnItemAt, updateItems, clearItems, itemTypeFor, getItems } from './items.js?v=4';
 import { ACHIEVEMENTS, createStats, recordKill, recordFloor, checkAchievements } from './achievements.js?v=1';
-import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=4';
+import { playHit, playDeath, playAbsorb, playLevelUp, playAchievement, playItemPickup, resumeAudio, startMusic, toggleMusic, isMusicMuted } from './audio.js?v=5';
 import { buildMap, createLightmapTexture } from './level.js?v=12';
 import {
   triggerAbility, updateAbilities, clearAbilities, getCooldowns, getAbilityCount,
@@ -37,7 +37,7 @@ import {
   createEnemyHealthBar, positionEnemyHealthBar, clearEnemyHealthBars, getHealthBarCount,
   createSpawnIndicator, positionSpawnIndicator, showBanner,
 } from './ui.js?v=7';
-import { initDebug, updateDebug } from './debug.js?v=1';
+import { initDebug, updateDebug, isDebugVisible } from './debug.js?v=2';
 
 // --- Overlay -----------------------------------------------------------------
 const ui = createUI();
@@ -169,6 +169,14 @@ addEventListener('keydown', (event) => {
   if (event.code === 'KeyE' && !event.repeat && !abilityKeyHeld) {
     abilityKeyHeld = true;
     tryTriggerAbility();
+  }
+  if (isDebugVisible()) {
+    const debugElements = { Digit1: 'fire', Digit2: 'water', Digit3: 'earth', Digit4: 'wind' };
+    if (debugElements[event.code]) {
+      const el = debugElements[event.code];
+      setElement(player, el);
+      setAbilityList(el);
+    }
   }
   if (state === 'gameover' && event.key.toLowerCase() === 'r') restart();
   tryStartMusic();

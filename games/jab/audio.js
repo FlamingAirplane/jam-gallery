@@ -15,20 +15,27 @@ function t0() {
   return audioCtx.currentTime;
 }
 
-function noiseBuffer(duration) {
-  const samples = Math.ceil(audioCtx.sampleRate * duration);
-  const buffer = audioCtx.createBuffer(1, samples, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < samples; i++) {
-    data[i] = Math.random() * 2 - 1;
+const noiseBuffers = new Map();
+
+function getNoiseBuffer(duration) {
+  ensureContext();
+  const key = Math.ceil(duration * 1000);
+  if (!noiseBuffers.has(key)) {
+    const samples = Math.ceil(audioCtx.sampleRate * duration);
+    const buffer = audioCtx.createBuffer(1, samples, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < samples; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    noiseBuffers.set(key, buffer);
   }
-  return buffer;
+  return noiseBuffers.get(key);
 }
 
 function playNoise({ duration = 0.2, volume = 0.2, filterFreq = 2000, filterType = 'lowpass', attack = 0.005 }) {
   const t = t0();
   const source = audioCtx.createBufferSource();
-  source.buffer = noiseBuffer(duration);
+  source.buffer = getNoiseBuffer(duration);
   const filter = audioCtx.createBiquadFilter();
   filter.type = filterType;
   filter.frequency.setValueAtTime(filterFreq, t);

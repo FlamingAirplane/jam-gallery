@@ -52,6 +52,10 @@ export function initDebug() {
   };
 }
 
+export function isDebugVisible() {
+  return visible;
+}
+
 export function updateDebug(dt, stats) {
   if (!visible || !panel) return;
 

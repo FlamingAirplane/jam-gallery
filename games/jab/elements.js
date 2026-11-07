@@ -4,6 +4,17 @@ import { elementTypes, elementColors, elementFieldRadius, arenaSize } from './tu
 
 const fields = [];
 
+// Shared geometry and per-type materials so fields don't allocate on every drop.
+const poolGeometry = new THREE.CylinderGeometry(elementFieldRadius, elementFieldRadius, 0.08, 16);
+poolGeometry.translate(0, 0.04, 0);
+const ringGeometry = new THREE.TorusGeometry(elementFieldRadius * 0.6, 0.08, 8, 16);
+const poolMaterials = {};
+const ringMaterials = {};
+for (const type of elementTypes) {
+  poolMaterials[type] = new THREE.MeshBasicMaterial({ color: elementColors[type] });
+  ringMaterials[type] = new THREE.MeshBasicMaterial({ color: elementColors[type] });
+}
+
 function randomPosition() {
   // Keep fields away from the player spawn at (0,0) and inside the arena.
   const minDistFromSpawn = 4;
@@ -18,23 +29,19 @@ function randomPosition() {
 
 function createFieldMesh(scene, type, x, z) {
   const group = new THREE.Group();
-  const color = elementColors[type];
 
   // Glowing pool on the floor.
-  const poolGeo = new THREE.CylinderGeometry(elementFieldRadius, elementFieldRadius, 0.08, 24);
-  poolGeo.translate(0, 0.04, 0);
-  const pool = new THREE.Mesh(poolGeo, new THREE.MeshBasicMaterial({ color }));
+  const pool = new THREE.Mesh(poolGeometry, poolMaterials[type]);
   group.add(pool);
 
   // Floating rune ring above it.
-  const ringGeo = new THREE.TorusGeometry(elementFieldRadius * 0.6, 0.08, 8, 16);
-  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color }));
+  const ring = new THREE.Mesh(ringGeometry, ringMaterials[type]);
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.9;
   group.add(ring);
 
   // Small local light so the element pools read clearly in the dark.
-  const light = new THREE.PointLight(color, 2.2, 9);
+  const light = new THREE.PointLight(elementColors[type], 2.2, 9);
   light.position.y = 0.8;
   group.add(light);
 
